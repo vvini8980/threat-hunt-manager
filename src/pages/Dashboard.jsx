@@ -14,7 +14,8 @@ import {
   YAxis,
 } from 'recharts'
 import StatCard from '../components/Dashboard/StatCard'
-import { getMonthlyStats, getStats, getAllHypotheses } from '../services/storage'
+import { getMonthlyStats } from '../services/storage'
+import { useHypotheses } from '../hooks/useHypotheses'
 import { useNavigate } from 'react-router-dom'
 import Spinner from '../components/Common/Spinner'
 
@@ -93,10 +94,8 @@ const STATUS_COLORS = {
 
 function Dashboard() {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    total: 0, active: 0, planned: 0, completed: 0, tp: 0, fp: 0, undetermined: 0
-  })
+  const { hypotheses, stats, loading } = useHypotheses()
+  
   const [monthlyData, setMonthlyData] = useState([])
   const [tacticData, setTacticData] = useState([])
   const [maxTacticCount, setMaxTacticCount] = useState(0)
@@ -105,17 +104,15 @@ function Dashboard() {
   const [hasResults, setHasResults] = useState(false)
 
   useEffect(() => {
-    const rawStats = getStats()
-    setStats(rawStats)
+    if (loading) return;
 
-    const rawMonthly = getMonthlyStats().map(item => ({
+    const rawMonthly = getMonthlyStats(hypotheses).map(item => ({
       ...item,
       label: formatMonthLabel(item.month),
     }))
     setMonthlyData(rawMonthly)
 
-    const allHypotheses = getAllHypotheses()
-    const tacticCounts = allHypotheses.reduce((acc, hyp) => {
+    const tacticCounts = hypotheses.reduce((acc, hyp) => {
       if (hyp.tactic) {
         acc[hyp.tactic] = (acc[hyp.tactic] || 0) + 1
       }
@@ -128,20 +125,19 @@ function Dashboard() {
     setTacticData(tData)
     setMaxTacticCount(tData.length > 0 ? Math.max(...tData.map(d => d.count)) : 0)
 
-    const recent = [...allHypotheses]
+    const recent = [...hypotheses]
       .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
       .slice(0, 5)
     setRecentActivity(recent)
 
     const rData = [
-      { name: 'TP', value: rawStats.tp },
-      { name: 'FP', value: rawStats.fp },
-      { name: 'Undetermined', value: rawStats.undetermined },
+      { name: 'TP', value: stats.tp || 0 },
+      { name: 'FP', value: stats.fp || 0 },
+      { name: 'Undetermined', value: stats.undetermined || 0 },
     ]
     setResultData(rData)
     setHasResults(rData.some(item => item.value > 0))
-    setLoading(false)
-  }, [])
+  }, [hypotheses, stats, loading])
 
   if (loading) {
     return <Spinner size="lg" text="Calculating dashboard statistics..." />

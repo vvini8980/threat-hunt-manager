@@ -15,7 +15,6 @@ const COLUMNS = [
   { key: 'splunkSPL', label: 'Splunk Query' },
   { key: 'qradarAQL', label: 'QRadar Query' },
   { key: 'sentinelKQL', label: 'Sentinel Query' },
-  { key: 'status', label: 'Results Or comments' },
   { key: 'socDetectionRule', label: 'SOC/Usecase Rule' },
   { key: 'result', label: 'Results TP/FP/Undetermined' },
 ]
@@ -177,10 +176,6 @@ function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
                   <span className="line-clamp-2" title={hypothesis.sentinelKQL}>
                     {hypothesis.sentinelKQL || '--'}
                   </span>
-                </td>
-                <td className="px-4 py-3">
-                  {/* Results Or Comments placeholder mapped to Status for now as discussed */}
-                  <StatusBadge status={hypothesis.status} />
                 </td>
                 <td className="max-w-[150px] px-4 py-3 text-xs text-gray-400">
                   <span className="line-clamp-2" title={hypothesis.socDetectionRule}>

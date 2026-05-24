@@ -20,6 +20,8 @@ const getStatusColor = (status) => {
     case 'Completed': return 'bg-green-500';
     case 'Closed': return 'bg-gray-500';
     case 'Pending': return 'bg-purple-500';
+    case 'Shared': return 'bg-teal-500';
+    case 'ETA': return 'bg-orange-500';
     default: return 'bg-gray-500';
   }
 };
@@ -31,9 +33,30 @@ const StatusBadge = ({ status }) => {
     Completed: 'bg-green-500/20 text-green-400 border-green-500/30',
     Closed: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     Pending: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    Shared: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+    ETA: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
   };
   const cls = colors[status] || colors.Closed;
   return <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${cls}`}>{status}</span>;
+};
+
+const getDropdownStyle = (status) => {
+  switch (status) {
+    case 'Completed':
+      return 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20';
+    case 'Shared':
+      return 'bg-teal-500/10 text-teal-400 border-teal-500/30 hover:bg-teal-500/20';
+    case 'ETA':
+      return 'bg-orange-500/10 text-orange-400 border-orange-500/30 hover:bg-orange-500/20';
+    case 'Pending':
+      return 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20';
+    case 'Active':
+      return 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20';
+    case 'Planned':
+      return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/20';
+    default:
+      return 'bg-gray-500/10 text-gray-400 border-gray-500/30 hover:bg-gray-500/20';
+  }
 };
 
 const ResultBadge = ({ result }) => {
@@ -71,9 +94,7 @@ function Campaigns() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthsData, setMonthsData] = useState([]);
   
-  // Inline edit state
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ clientName: '', assignedAnalyst: '', status: 'Planned' });
+  // Inline edit state removed - direct dropdown & date picker are used instead
 
   // Side panel state
   const [selectedHypo, setSelectedHypo] = useState(null);
@@ -142,30 +163,13 @@ function Campaigns() {
   const currentStats = monthsData.find(d => d.month === selectedMonth);
   const totalHypotheses = currentStats ? currentStats.total : 0;
 
-  const startEdit = (e, hypo) => {
-    e.stopPropagation();
-    setEditingId(hypo.id);
-    setEditForm({
-      clientName: hypo.clientName || '',
-      assignedAnalyst: hypo.assignedAnalyst || '',
-      status: hypo.status || 'Planned'
-    });
-  };
-
-  const cancelEdit = (e) => {
-    e.stopPropagation();
-    setEditingId(null);
-  };
-
-  const handleSaveEdit = async (e, id) => {
-    e.stopPropagation();
+  const handleDateChange = async (id, newDate) => {
     try {
-      await updateHypothesis(id, editForm);
-      setEditingId(null);
+      await updateHypothesis(id, { planned: newDate });
       refresh();
-      showToast('Assignment updated successfully', 'success');
-    } catch (err) {
-      showToast('Failed to update assignment', 'error');
+      showToast('Date updated successfully', 'success');
+    } catch (error) {
+      showToast('Failed to update date', 'error');
     }
   };
 
@@ -495,12 +499,25 @@ function Campaigns() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">👤 Individual Assignments</h3>
-          <button
-            onClick={() => navigate('/add?type=individual')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg"
-          >
-            + Add Assignment
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                exportToExcel(individualHunts, `Individual_Assignments_${formatMonth(selectedMonth).replace(/\s+/g, '')}`);
+                showToast("Individual assignments exported to Excel", "success");
+              }}
+              disabled={individualHunts.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-green-500/50 text-green-400 hover:bg-green-500/10 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Export Table</span>
+            </button>
+            <button
+              onClick={() => navigate('/add?type=individual')}
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg"
+            >
+              + Add Assignment
+            </button>
+          </div>
         </div>
         {individualHunts.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
@@ -510,70 +527,14 @@ function Campaigns() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Client Name</th>
                     <th className="px-4 py-3 font-semibold">Assigned Analyst</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold text-right">Actions</th>
+                    <th className="px-4 py-3 font-semibold">Status / Date</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2a2d3e]">
                   {individualHunts.map((hypo, index) => (
-                    editingId === hypo.id ? (
-                      <tr key={hypo.id} className="bg-[#1e2130]">
-                        <td className="px-4 py-3">
-                          <input
-                            className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-                            value={editForm.clientName}
-                            onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
-                            onClick={e => e.stopPropagation()}
-                            placeholder="Client Name"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-                            value={editForm.assignedAnalyst}
-                            onChange={(e) => setEditForm({ ...editForm, assignedAnalyst: e.target.value })}
-                            onClick={e => e.stopPropagation()}
-                            placeholder="Analyst Name"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-                            value={editForm.status}
-                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <option value="Planned">Planned</option>
-                            <option value="Active">Active</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Closed">Closed</option>
-                          </select>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={(e) => handleSaveEdit(e, hypo.id)}
-                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-500/20 rounded-md transition-colors"
-                              title="Save Changes"
-                            >
-                              <Check className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-md transition-colors"
-                              title="Cancel Edit"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
                     <tr 
                       key={hypo.id}
-                      onClick={() => setSelectedHypo(hypo)}
-                      className={`transition-colors hover:bg-[#252840] cursor-pointer ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
+                      className={`transition-colors ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
                     >
                       <td className="px-4 py-3 text-gray-300 font-bold">
                         {hypo.clientName ? (
@@ -584,19 +545,35 @@ function Campaigns() {
                         {hypo.assignedAnalyst || 'Unassigned'}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={hypo.status} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={(e) => startEdit(e, hypo)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/20 rounded-md transition-colors"
-                          title="Edit Assignment"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 max-w-xs">
+                          <div className="relative flex items-center">
+                            <select
+                              value={hypo.status || 'Pending'}
+                              onChange={(e) => handleStatusChange(hypo.id, e.target.value)}
+                              className={`appearance-none font-semibold text-xs rounded-full border pl-3 pr-6 py-1 outline-none cursor-pointer transition-colors ${getDropdownStyle(hypo.status)}`}
+                            >
+                              <option value="Pending" className="bg-[#1a1d27] text-purple-400 font-semibold">Pending</option>
+                              <option value="Completed" className="bg-[#1a1d27] text-green-400 font-semibold">Completed</option>
+                              <option value="Shared" className="bg-[#1a1d27] text-teal-400 font-semibold">Shared</option>
+                              <option value="ETA" className="bg-[#1a1d27] text-orange-400 font-semibold">ETA</option>
+                              <option value="Planned" className="bg-[#1a1d27] text-yellow-400 font-semibold">Planned</option>
+                              <option value="Active" className="bg-[#1a1d27] text-blue-400 font-semibold">Active</option>
+                              <option value="Closed" className="bg-[#1a1d27] text-gray-400 font-semibold">Closed</option>
+                            </select>
+                            <div className="pointer-events-none absolute right-2 flex items-center">
+                              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                          </div>
+                          <input
+                            type="date"
+                            value={hypo.planned ? hypo.planned.slice(0, 10) : ''}
+                            onChange={(e) => handleDateChange(hypo.id, e.target.value)}
+                            className="bg-[#0f1117] border border-[#2a2d3e] hover:border-gray-500 rounded-lg px-2.5 py-1 text-xs text-gray-300 outline-none focus:border-indigo-500 transition-colors w-[130px]"
+                            title="Completion / ETA Date for client report"
+                          />
+                        </div>
                       </td>
                     </tr>
-                    )
                   ))}
                 </tbody>
               </table>

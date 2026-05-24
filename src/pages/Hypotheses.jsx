@@ -5,6 +5,7 @@ import HypoTable from '../components/Hypotheses/HypoTable'
 import { useHypotheses } from '../hooks/useHypotheses'
 import { addComment, seedTestData, updateHypothesis } from '../services/storage'
 import Spinner from '../components/Common/Spinner'
+import QuickImport from '../components/Common/QuickImport'
 
 const STATUS_OPTIONS = ['Planned', 'Active', 'Pending', 'Completed', 'Closed']
 const RESULT_OPTIONS = ['TP', 'FP', 'Undetermined']
@@ -118,12 +119,15 @@ function Hypotheses() {
           </span>
         </div>
 
-        <Link
-          to="/add"
-          className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
-        >
-          Add New
-        </Link>
+        <div className="flex items-center gap-3">
+          <QuickImport mode="hypotheses" onDone={refresh} />
+          <Link
+            to="/add"
+            className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+          >
+            Add New
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6 rounded-xl border border-border bg-bg-secondary p-4">

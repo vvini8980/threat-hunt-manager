@@ -4,6 +4,7 @@ import { useHypotheses } from '../hooks/useHypotheses';
 import { getMonthlyStats } from '../services/storage';
 import { exportToExcel } from '../utils/excel';
 import { generatePDFReport } from '../utils/export';
+import QuickImport from '../components/Common/QuickImport';
 import { 
   ChevronLeft, ChevronRight, Calendar, 
   Target, CheckCircle, Activity, 
@@ -65,7 +66,7 @@ const CustomTooltip = ({ active, payload }) => {
 
 function Campaigns() {
   const navigate = useNavigate();
-  const { hypotheses } = useHypotheses();
+  const { hypotheses, refresh } = useHypotheses();
   const { showToast } = useToastContext();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthsData, setMonthsData] = useState([]);
@@ -244,15 +245,20 @@ function Campaigns() {
           </div>
         </div>
 
-        {/* Right Side: Export Buttons */}
-        <div className="flex items-center gap-3 self-center md:self-end md:mb-2">
+        {/* Right Side: Import + Export Buttons */}
+        <div className="flex flex-wrap items-center gap-3 self-center md:self-end md:mb-2">
+          <QuickImport
+            mode="lead"
+            defaultMonth={selectedMonth}
+            onDone={refresh}
+          />
+          <div className="w-px h-6 bg-[#2a2d3e]" />
           <button
             onClick={() => {
               exportToExcel(monthHypotheses, `MonthlyHunts_${formatMonth(selectedMonth).replace(/\s+/g, '')}`);
               showToast("Excel file downloaded", "info");
             }}
             disabled={monthHypotheses.length === 0}
-            title={monthHypotheses.length === 0 ? "No data to export" : "Export to Excel"}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-green-500/50 text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm shadow-lg"
           >
             <FileSpreadsheet className="w-4 h-4" />
@@ -265,7 +271,6 @@ function Campaigns() {
               showToast("PDF report downloaded", "info");
             }}
             disabled={monthHypotheses.length === 0}
-            title={monthHypotheses.length === 0 ? "No data to export" : "Download PDF Report"}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm shadow-lg"
           >
             <FileText className="w-4 h-4" />

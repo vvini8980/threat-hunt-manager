@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHypotheses } from '../hooks/useHypotheses';
-import { getMonthlyStats } from '../services/storage';
+import { getMonthlyStats, updateHypothesis, addComment } from '../services/storage';
 import { exportToExcel } from '../utils/excel';
 import QuickImport from '../components/Common/QuickImport';
+import HypoDetail from '../components/Hypotheses/HypoDetail';
 import { 
   ChevronLeft, ChevronRight, Calendar, 
   Target, CheckCircle, Activity, 
   ShieldCheck, AlertTriangle,
-  FileSpreadsheet, Edit
+  FileSpreadsheet, Edit, Check, X
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useToastContext } from '../context/ToastContext';
@@ -69,11 +70,38 @@ function Campaigns() {
   const { showToast } = useToastContext();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthsData, setMonthsData] = useState([]);
+  
+  // Inline edit state
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ clientName: '', assignedAnalyst: '', status: 'Planned' });
+
+  // Side panel state
+  const [selectedHypo, setSelectedHypo] = useState(null);
+
+  // Month status state (Drafted vs Production)
+  const [monthStatus, setMonthStatus] = useState('Drafted');
+
+  useEffect(() => {
+    setMonthStatus(localStorage.getItem(`campaign_status_${selectedMonth}`) || 'Drafted');
+  }, [selectedMonth]);
+
+  const toggleMonthStatus = (newStatus) => {
+    setMonthStatus(newStatus);
+    localStorage.setItem(`campaign_status_${selectedMonth}`, newStatus);
+    showToast(`Campaign set to ${newStatus}`, 'success');
+  };
 
   useEffect(() => {
     const data = getMonthlyStats(hypotheses);
     setMonthsData(data);
   }, [hypotheses]);
+
+  useEffect(() => {
+    if (selectedHypo) {
+      const updated = hypotheses.find(h => h.id === selectedHypo.id);
+      if (updated) setSelectedHypo(updated);
+    }
+  }, [hypotheses, selectedHypo]);
 
 
 
@@ -113,6 +141,52 @@ function Campaigns() {
 
   const currentStats = monthsData.find(d => d.month === selectedMonth);
   const totalHypotheses = currentStats ? currentStats.total : 0;
+
+  const startEdit = (e, hypo) => {
+    e.stopPropagation();
+    setEditingId(hypo.id);
+    setEditForm({
+      clientName: hypo.clientName || '',
+      assignedAnalyst: hypo.assignedAnalyst || '',
+      status: hypo.status || 'Planned'
+    });
+  };
+
+  const cancelEdit = (e) => {
+    e.stopPropagation();
+    setEditingId(null);
+  };
+
+  const handleSaveEdit = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await updateHypothesis(id, editForm);
+      setEditingId(null);
+      refresh();
+      showToast('Assignment updated successfully', 'success');
+    } catch (err) {
+      showToast('Failed to update assignment', 'error');
+    }
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await updateHypothesis(id, { status: newStatus });
+      refresh();
+      showToast('Status updated', 'success');
+    } catch (error) {
+      showToast('Failed to update status', 'error');
+    }
+  };
+
+  const handleAddComment = async (id, text, analyst) => {
+    try {
+      await addComment(id, text, analyst);
+      refresh();
+    } catch (error) {
+      showToast('Failed to add comment', 'error');
+    }
+  };
 
   // Derive stats based on selectedMonth filtering
   const monthHypotheses = hypotheses.filter(h => h.month === selectedMonth);
@@ -191,22 +265,16 @@ function Campaigns() {
   return (
     <section className="min-h-full bg-bg-primary p-6 text-white max-w-6xl mx-auto pb-24">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
-        
-        {/* Left Side: Title & Selectors */}
-        <div className="flex flex-col items-center md:items-start">
-          <h2 className="text-3xl font-bold mb-4 flex items-center gap-2">
-            📅 Monthly
-          </h2>
-          
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-            {/* Month Selector */}
-            <div className="flex items-center gap-4 bg-[#1a1d27] border border-[#2a2d3e] rounded-full p-2 shadow-lg">
+      {/* Header & Month Selector */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#2a2d3e] pb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-4">Monthly Campaigns</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-4 bg-[#1a1d27] border border-[#2a2d3e] rounded-xl p-2 shadow-lg">
               <button 
                 onClick={handlePrevious}
                 disabled={!hasPrevious}
-                className={`p-2 rounded-full transition-colors ${!hasPrevious ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 hover:text-white hover:bg-[#2a2d3e]'}`}
+                className={`p-2 rounded-lg transition-colors ${!hasPrevious ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 hover:text-white hover:bg-[#252840]'}`}
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -232,15 +300,27 @@ function Campaigns() {
               <button 
                 onClick={handleNext}
                 disabled={!hasNext}
-                className={`p-2 rounded-full transition-colors ${!hasNext ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 hover:text-white hover:bg-[#2a2d3e]'}`}
+                className={`p-2 rounded-lg transition-colors ${!hasNext ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 hover:text-white hover:bg-[#252840]'}`}
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
-            
-            <p className="text-sm font-medium text-gray-400 bg-[#1a1d27] px-4 py-1.5 rounded-full border border-[#2a2d3e]">
-              {totalHypotheses} {totalHypotheses === 1 ? 'hypothesis' : 'hypotheses'} this month
-            </p>
+
+            {/* Drafted / Production Toggle */}
+            <div className="flex items-center rounded-lg bg-[#1a1d27] p-1 border border-[#2a2d3e] shadow-sm">
+              <button
+                onClick={() => toggleMonthStatus('Drafted')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-colors ${monthStatus === 'Drafted' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' : 'text-gray-500 hover:text-white'}`}
+              >
+                <AlertTriangle className="w-4 h-4" /> Drafted
+              </button>
+              <button
+                onClick={() => toggleMonthStatus('Production')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-colors ${monthStatus === 'Production' ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 'text-gray-500 hover:text-white'}`}
+              >
+                <CheckCircle className="w-4 h-4" /> Production
+              </button>
+            </div>
           </div>
         </div>
 
@@ -370,34 +450,33 @@ function Campaigns() {
           </div>
         </div>
         {generalHunts.length > 0 ? (
-          <div className="flex flex-col divide-y divide-indigo-500/20">
-            {generalHunts.map((hypo) => (
-              <div
-                key={hypo.id}
-                onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-indigo-500/10 transition-colors cursor-pointer group gap-4"
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getStatusColor(hypo.status)}`} />
-                  <div>
-                    <h4 className="text-white font-bold mb-1 group-hover:text-indigo-300 transition-colors">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Hypothesis Name</th>
+                  <th className="px-4 py-3 font-semibold">MITRE Name</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#2a2d3e]">
+                {generalHunts.map((hypo, index) => (
+                  <tr 
+                    key={hypo.id}
+                    onClick={() => setSelectedHypo(hypo)}
+                    className={`transition-colors hover:bg-[#252840] cursor-pointer ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
+                  >
+                    <td className="px-4 py-3 text-white font-medium">
                       {hypo.hypoName}
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-2">
+                    </td>
+                    <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-mono">
-                        {hypo.mitreId}
+                        {hypo.mitreId || '--'}
                       </span>
-                      {hypo.tactic && <span className="text-xs text-gray-500">{hypo.tactic}</span>}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 pl-7 md:pl-0">
-                  <StatusBadge status={hypo.status} />
-                  <ResultBadge result={hypo.result} />
-                  <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white transition-colors hidden md:block" />
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="p-8 text-center">
@@ -437,9 +516,63 @@ function Campaigns() {
                 </thead>
                 <tbody className="divide-y divide-[#2a2d3e]">
                   {individualHunts.map((hypo, index) => (
+                    editingId === hypo.id ? (
+                      <tr key={hypo.id} className="bg-[#1e2130]">
+                        <td className="px-4 py-3">
+                          <input
+                            className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                            value={editForm.clientName}
+                            onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                            onClick={e => e.stopPropagation()}
+                            placeholder="Client Name"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                            value={editForm.assignedAnalyst}
+                            onChange={(e) => setEditForm({ ...editForm, assignedAnalyst: e.target.value })}
+                            onClick={e => e.stopPropagation()}
+                            placeholder="Analyst Name"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                            value={editForm.status}
+                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <option value="Planned">Planned</option>
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Closed">Closed</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={(e) => handleSaveEdit(e, hypo.id)}
+                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-500/20 rounded-md transition-colors"
+                              title="Save Changes"
+                            >
+                              <Check className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-md transition-colors"
+                              title="Cancel Edit"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
                     <tr 
                       key={hypo.id}
-                      onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
+                      onClick={() => setSelectedHypo(hypo)}
                       className={`transition-colors hover:bg-[#252840] cursor-pointer ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
                     >
                       <td className="px-4 py-3 text-gray-300 font-bold">
@@ -455,10 +588,7 @@ function Campaigns() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/edit/${hypo.id}`);
-                          }}
+                          onClick={(e) => startEdit(e, hypo)}
                           className="p-1.5 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/20 rounded-md transition-colors"
                           title="Edit Assignment"
                         >
@@ -466,6 +596,7 @@ function Campaigns() {
                         </button>
                       </td>
                     </tr>
+                    )
                   ))}
                 </tbody>
               </table>
@@ -525,6 +656,16 @@ function Campaigns() {
           </div>
         </div>
       )}
+
+      <HypoDetail
+        hypothesis={selectedHypo}
+        onClose={() => setSelectedHypo(null)}
+        onEdit={() => selectedHypo && navigate(`/edit/${selectedHypo.id}`)}
+        currentStatus={selectedHypo?.status}
+        onStatusChange={handleStatusChange}
+        comments={selectedHypo?.comments}
+        onAddComment={handleAddComment}
+      />
 
     </section>
   );

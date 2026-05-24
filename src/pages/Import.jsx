@@ -12,7 +12,7 @@ import { Check, ChevronRight, FileText } from 'lucide-react';
 
 function Import() {
   const navigate = useNavigate();
-  const { hypotheses } = useHypotheses();
+  const { hypotheses, refresh } = useHypotheses();
   const { showToast } = useToastContext();
 
   // Wizard State
@@ -70,10 +70,10 @@ function Import() {
         const hypToImport = { ...validRows[i] };
         hypToImport.hypoName = getUniqueName(hypToImport.hypoName);
 
-        addHypothesis(hypToImport);
-        // Small delay to let UI breathe and show progress
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await addHypothesis(hypToImport);
       }
+      
+      await refresh();
 
       setIsImporting(false);
       setImportSuccess(true);

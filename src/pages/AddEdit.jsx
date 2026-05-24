@@ -47,6 +47,9 @@ export default function AddEdit() {
       if (existing) setForm(existing)
     } else {
       const mitreIdParam = searchParams.get('mitreId')
+      const typeParam = searchParams.get('type')
+      const isGeneralVal = typeParam === 'general'
+
       if (mitreIdParam && mitreData) {
         const technique = mitreData.techniques?.find(t => t.id === mitreIdParam) || 
                           mitreData.subTechniques?.find(t => t.id === mitreIdParam)
@@ -57,13 +60,16 @@ export default function AddEdit() {
           const tacticObj = mitreData.tactics?.find(t => t.shortName === tacticShort)
           setForm(f => ({
             ...f,
+            isGeneral: isGeneralVal,
             mitreId: technique.id,
             subTechnique: isSubTech ? `${technique.id} - ${technique.name}` : '',
             tactic: tacticObj?.name || tacticShort,
           }))
         } else {
-          setForm(f => ({ ...f, mitreId: mitreIdParam }))
+          setForm(f => ({ ...f, isGeneral: isGeneralVal, mitreId: mitreIdParam }))
         }
+      } else {
+        setForm(f => ({ ...f, isGeneral: isGeneralVal }))
       }
     }
   }, [id, hypotheses, searchParams, mitreData])

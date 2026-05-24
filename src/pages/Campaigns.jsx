@@ -564,13 +564,15 @@ function Campaigns() {
                               <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>
                             </div>
                           </div>
-                          <input
-                            type="date"
-                            value={hypo.planned ? hypo.planned.slice(0, 10) : ''}
-                            onChange={(e) => handleDateChange(hypo.id, e.target.value)}
-                            className="bg-[#0f1117] border border-[#2a2d3e] hover:border-gray-500 rounded-lg px-2.5 py-1 text-xs text-gray-300 outline-none focus:border-indigo-500 transition-colors w-[130px]"
-                            title="Completion / ETA Date for client report"
-                          />
+                          {hypo.status === 'ETA' && (
+                            <input
+                              type="date"
+                              value={hypo.planned ? hypo.planned.slice(0, 10) : ''}
+                              onChange={(e) => handleDateChange(hypo.id, e.target.value)}
+                              className="bg-[#1e1a17] border border-orange-500/30 hover:border-orange-500/60 rounded-lg px-2.5 py-1 text-xs text-orange-300 font-semibold outline-none focus:border-orange-500 transition-colors w-[135px]"
+                              title="ETA Date for client report"
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>

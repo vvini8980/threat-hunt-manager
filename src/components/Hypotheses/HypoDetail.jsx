@@ -172,66 +172,6 @@ function HypoDetail({
             </div>
           </div>
 
-          <div className="border-b border-[#2a2d3e] py-6">
-            <h4 className="mb-5 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Status Progress
-            </h4>
-
-            <div className="flex items-start">
-              {STATUS_STEPS.map((status, index) => {
-                const isCompleted = index < currentIndex
-                const isCurrent = index === currentIndex
-                const isLineCompleted = index < currentIndex
-
-                return (
-                  <div
-                    key={status}
-                    className="flex flex-1 items-start last:flex-none"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleStatusChange(status)}
-                      className="group flex w-16 flex-col items-center gap-2 text-center"
-                    >
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
-                          isCompleted
-                            ? 'border-indigo-500 bg-indigo-500'
-                            : isCurrent
-                            ? 'border-indigo-400 bg-transparent'
-                            : 'border-gray-600 bg-transparent group-hover:border-gray-400'
-                        }`}
-                      >
-                        {isCurrent && (
-                          <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                        )}
-                      </span>
-                      <span
-                        className={`text-[11px] font-medium ${
-                          isCurrent
-                            ? 'text-white'
-                            : isCompleted
-                            ? 'text-indigo-300'
-                            : 'text-gray-500 group-hover:text-gray-300'
-                        }`}
-                      >
-                        {status}
-                      </span>
-                    </button>
-
-                    {index < STATUS_STEPS.length - 1 && (
-                      <div
-                        className={`mt-3 h-0.5 min-w-0 flex-1 transition-colors ${
-                          isLineCompleted ? 'bg-indigo-500' : 'bg-gray-700'
-                        }`}
-                      />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
           <div className="space-y-4 pt-5">
             <section className={sectionClass}>
               <p className={labelClass}>Description</p>

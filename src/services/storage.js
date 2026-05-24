@@ -26,7 +26,7 @@ const normalizeMonth = (monthStr) => {
   return monthStr;
 };
 
-// ── CRUD ─────────────────────────────────────
+// ── CRUD - Hypotheses Library ─────────────────
 
 export const getAllHypotheses = async () => {
   try {
@@ -64,9 +64,13 @@ export const addHypothesis = async (data) => {
   // Strip out UI-only or nested arrays like comments if they were passed
   const { id, comments, createdAt, updatedAt, ...insertData } = data;
   
+  // Extract assignment specific tracking fields
+  const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = insertData;
+  
+  // 1. Insert into permanent hypotheses catalog
   const { data: inserted, error } = await supabase
     .from('hypotheses')
-    .insert([insertData])
+    .insert([hypoData])
     .select()
     .single();
     
@@ -74,15 +78,39 @@ export const addHypothesis = async (data) => {
     console.error('Error adding hypothesis:', error);
     throw error;
   }
+
+  // 2. Automatically link a tracking assignment record if month or client info is provided
+  if (month) {
+    const { error: assignError } = await supabase
+      .from('assignments')
+      .insert([{
+        hypothesis_id: inserted.id,
+        month: normalizeMonth(month),
+        clientName: clientName || '',
+        assignedAnalyst: assignedAnalyst || '',
+        status: status || 'Pending',
+        planned: planned || '',
+        isGeneral: isGeneral || false,
+        result: result || ''
+      }]);
+      
+    if (assignError) {
+      console.error('Error creating linked assignment:', assignError);
+    }
+  }
+  
   return inserted;
 };
 
 export const updateHypothesis = async (id, data) => {
   const { comments, created_at, updated_at, id: hypoId, createdAt, updatedAt, ...updateData } = data;
   
+  // Extract assignment fields if passed, to ensure clean update of library columns
+  const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = updateData;
+
   const { data: updated, error } = await supabase
     .from('hypotheses')
-    .update({ ...updateData, updated_at: new Date().toISOString() })
+    .update({ ...hypoData, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single();
@@ -106,6 +134,83 @@ export const deleteHypothesis = async (id) => {
   }
   return true;
 };
+
+// ── CRUD - Assignments ───────────────────────
+
+export const getAllAssignments = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('*, hypotheses(*), comments(*)');
+      
+    if (error) {
+      console.error('Supabase error fetching assignments:', error);
+      return [];
+    }
+    
+    // Format and return flat mappings that mimic the unified hypothesis schema
+    return (data || []).map(a => ({
+      id: a.id, // Assignment ID
+      month: normalizeMonth(a.month),
+      clientName: a.clientName || '',
+      assignedAnalyst: a.assignedAnalyst || '',
+      status: a.status || 'Pending',
+      planned: a.planned || '',
+      isGeneral: a.isGeneral || false,
+      result: a.result || '',
+      created_at: a.created_at,
+      updated_at: a.updated_at,
+      // Linked hypothesis details:
+      hypothesis_id: a.hypothesis_id,
+      hypoName: a.hypotheses?.hypoName || 'Untitled Hypothesis',
+      mitreId: a.hypotheses?.mitreId || '--',
+      subTechnique: a.hypotheses?.subTechnique || '',
+      tactic: a.hypotheses?.tactic || '',
+      description: a.hypotheses?.description || '',
+      huntingLogic: a.hypotheses?.huntingLogic || '',
+      socDetectionRule: a.hypotheses?.socDetectionRule || '',
+      splunkSPL: a.hypotheses?.splunkSPL || '',
+      qradarAQL: a.hypotheses?.qradarAQL || '',
+      sentinelKQL: a.hypotheses?.sentinelKQL || '',
+      comments: a.comments || a.hypotheses?.comments || []
+    }));
+  } catch (err) {
+    console.error('Exception fetching assignments:', err);
+    return [];
+  }
+};
+
+export const updateAssignment = async (id, data) => {
+  const { comments, created_at, updated_at, id: assignId, ...updateData } = data;
+  
+  const { data: updated, error } = await supabase
+    .from('assignments')
+    .update({ ...updateData, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+    
+  if (error) {
+    console.error('Error updating assignment:', error);
+    throw error;
+  }
+  return updated;
+};
+
+export const deleteAssignment = async (id) => {
+  const { error } = await supabase
+    .from('assignments')
+    .delete()
+    .eq('id', id);
+    
+  if (error) {
+    console.error('Error deleting assignment:', error);
+    return false;
+  }
+  return true;
+};
+
+// ── Comments ──────────────────────────────────
 
 export const addComment = async (id, commentText, analyst = 'Analyst') => {
   const { data, error } = await supabase

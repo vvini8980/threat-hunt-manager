@@ -89,7 +89,7 @@ const CustomTooltip = ({ active, payload }) => {
 
 function Campaigns() {
   const navigate = useNavigate();
-  const { hypotheses, refresh } = useHypotheses();
+  const { hypotheses, assignments, refresh, updateAssignment } = useHypotheses();
   const { showToast } = useToastContext();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthsData, setMonthsData] = useState([]);
@@ -113,9 +113,9 @@ function Campaigns() {
   };
 
   useEffect(() => {
-    const data = getMonthlyStats(hypotheses);
+    const data = getMonthlyStats(assignments);
     setMonthsData(data);
-  }, [hypotheses]);
+  }, [assignments]);
 
   useEffect(() => {
     if (selectedHypo) {
@@ -175,7 +175,7 @@ function Campaigns() {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await updateHypothesis(id, { status: newStatus });
+      await updateAssignment(id, { status: newStatus });
       refresh();
       showToast('Status updated', 'success');
     } catch (error) {
@@ -185,7 +185,9 @@ function Campaigns() {
 
   const handleAddComment = async (id, text, analyst) => {
     try {
-      await addComment(id, text, analyst);
+      const target = assignments.find(a => a.id === id);
+      const hypoId = target?.hypothesis_id || id;
+      await addComment(hypoId, text, analyst);
       refresh();
     } catch (error) {
       showToast('Failed to add comment', 'error');
@@ -193,7 +195,7 @@ function Campaigns() {
   };
 
   // Derive stats based on selectedMonth filtering
-  const monthHypotheses = hypotheses.filter(h => h.month === selectedMonth);
+  const monthHypotheses = assignments.filter(h => h.month === selectedMonth);
 
   // Split into general pool vs individual assignments
   const generalHunts = monthHypotheses.filter(h => h.isGeneral);
@@ -639,7 +641,7 @@ function Campaigns() {
       <HypoDetail
         hypothesis={selectedHypo}
         onClose={() => setSelectedHypo(null)}
-        onEdit={() => selectedHypo && navigate(`/edit/${selectedHypo.id}`)}
+        onEdit={() => selectedHypo && navigate(`/edit/${selectedHypo.hypothesis_id || selectedHypo.id}`)}
         currentStatus={selectedHypo?.status}
         onStatusChange={handleStatusChange}
         comments={selectedHypo?.comments}

@@ -3,14 +3,17 @@ import * as storage from '../services/storage';
 
 export const useHypotheses = () => {
   const [hypotheses, setHypotheses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const data = await storage.getAllHypotheses();
-    setHypotheses(data);
-    setStats(storage.getStats(data));
+    const hypoData = await storage.getAllHypotheses();
+    const assignData = await storage.getAllAssignments();
+    setHypotheses(hypoData);
+    setAssignments(assignData);
+    setStats(storage.getStats(hypoData));
     setLoading(false);
   }, []);
 
@@ -28,8 +31,18 @@ export const useHypotheses = () => {
     await refresh();
   };
 
+  const updateAssignment = async (id, data) => {
+    await storage.updateAssignment(id, data);
+    await refresh();
+  };
+
   const remove = async (id) => {
     await storage.deleteHypothesis(id);
+    await refresh();
+  };
+
+  const removeAssignment = async (id) => {
+    await storage.deleteAssignment(id);
     await refresh();
   };
 
@@ -40,12 +53,15 @@ export const useHypotheses = () => {
 
   return {
     hypotheses,
+    assignments,
     stats,
     loading,
     refresh,
     add,
     update,
+    updateAssignment,
     remove,
+    removeAssignment,
     addComment
   };
 };

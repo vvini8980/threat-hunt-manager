@@ -67,10 +67,20 @@ export const addHypothesis = async (data) => {
   // Extract assignment specific tracking fields
   const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = insertData;
   
-  // 1. Insert into permanent hypotheses catalog
+  const trackingFields = month ? {
+    month: normalizeMonth(month),
+    clientName: clientName || '',
+    assignedAnalyst: assignedAnalyst || '',
+    status: status || 'Pending',
+    planned: planned || '',
+    isGeneral: isGeneral || false,
+    result: result || '',
+  } : {};
+
+  // 1. Insert into permanent hypotheses catalog (include tracking fields when assignments RLS blocks inserts)
   const { data: inserted, error } = await supabase
     .from('hypotheses')
-    .insert([hypoData])
+    .insert([{ ...hypoData, ...trackingFields }])
     .select()
     .single();
     
@@ -79,23 +89,17 @@ export const addHypothesis = async (data) => {
     throw error;
   }
 
-  // 2. Automatically link a tracking assignment record if month or client info is provided
+  // 2. Link a tracking assignment record when month is provided
   if (month) {
     const { error: assignError } = await supabase
       .from('assignments')
       .insert([{
         hypothesis_id: inserted.id,
-        month: normalizeMonth(month),
-        clientName: clientName || '',
-        assignedAnalyst: assignedAnalyst || '',
-        status: status || 'Pending',
-        planned: planned || '',
-        isGeneral: isGeneral || false,
-        result: result || ''
+        ...trackingFields,
       }]);
       
     if (assignError) {
-      console.error('Error creating linked assignment:', assignError);
+      console.warn('Assignment row not created (check Supabase RLS on assignments):', assignError.message);
     }
   }
   
@@ -137,6 +141,59 @@ export const deleteHypothesis = async (id) => {
 
 // ── CRUD - Assignments ───────────────────────
 
+const mapAssignmentRow = (a) => ({
+  id: a.id,
+  month: normalizeMonth(a.month),
+  clientName: a.clientName || '',
+  assignedAnalyst: a.assignedAnalyst || '',
+  status: a.status || 'Pending',
+  planned: a.planned || '',
+  isGeneral: a.isGeneral || false,
+  result: a.result || '',
+  created_at: a.created_at,
+  updated_at: a.updated_at,
+  hypothesis_id: a.hypothesis_id,
+  hypoName: a.hypotheses?.hypoName || 'Untitled Hypothesis',
+  mitreId: a.hypotheses?.mitreId || '--',
+  subTechnique: a.hypotheses?.subTechnique || '',
+  tactic: a.hypotheses?.tactic || '',
+  description: a.hypotheses?.description || '',
+  huntingLogic: a.hypotheses?.huntingLogic || '',
+  socDetectionRule: a.hypotheses?.socDetectionRule || '',
+  splunkSPL: a.hypotheses?.splunkSPL || '',
+  qradarAQL: a.hypotheses?.qradarAQL || '',
+  sentinelKQL: a.hypotheses?.sentinelKQL || '',
+  comments: a.comments || a.hypotheses?.comments || [],
+  _source: 'assignment',
+});
+
+/** Legacy rows: campaign fields stored directly on hypotheses (pre-assignments split). */
+const mapHypothesisAsAssignment = (h) => ({
+  id: h.id,
+  month: normalizeMonth(h.month),
+  clientName: h.clientName || '',
+  assignedAnalyst: h.assignedAnalyst || '',
+  status: h.status || 'Pending',
+  planned: h.planned || '',
+  isGeneral: h.isGeneral || false,
+  result: h.result || '',
+  created_at: h.created_at,
+  updated_at: h.updated_at,
+  hypothesis_id: h.id,
+  hypoName: h.hypoName || 'Untitled Hypothesis',
+  mitreId: h.mitreId || '--',
+  subTechnique: h.subTechnique || '',
+  tactic: h.tactic || '',
+  description: h.description || '',
+  huntingLogic: h.huntingLogic || '',
+  socDetectionRule: h.socDetectionRule || '',
+  splunkSPL: h.splunkSPL || '',
+  qradarAQL: h.qradarAQL || '',
+  sentinelKQL: h.sentinelKQL || '',
+  comments: h.comments || [],
+  _source: 'hypothesis',
+});
+
 export const getAllAssignments = async () => {
   try {
     const { data, error } = await supabase
@@ -147,33 +204,16 @@ export const getAllAssignments = async () => {
       console.error('Supabase error fetching assignments:', error);
       return [];
     }
-    
-    // Format and return flat mappings that mimic the unified hypothesis schema
-    return (data || []).map(a => ({
-      id: a.id, // Assignment ID
-      month: normalizeMonth(a.month),
-      clientName: a.clientName || '',
-      assignedAnalyst: a.assignedAnalyst || '',
-      status: a.status || 'Pending',
-      planned: a.planned || '',
-      isGeneral: a.isGeneral || false,
-      result: a.result || '',
-      created_at: a.created_at,
-      updated_at: a.updated_at,
-      // Linked hypothesis details:
-      hypothesis_id: a.hypothesis_id,
-      hypoName: a.hypotheses?.hypoName || 'Untitled Hypothesis',
-      mitreId: a.hypotheses?.mitreId || '--',
-      subTechnique: a.hypotheses?.subTechnique || '',
-      tactic: a.hypotheses?.tactic || '',
-      description: a.hypotheses?.description || '',
-      huntingLogic: a.hypotheses?.huntingLogic || '',
-      socDetectionRule: a.hypotheses?.socDetectionRule || '',
-      splunkSPL: a.hypotheses?.splunkSPL || '',
-      qradarAQL: a.hypotheses?.qradarAQL || '',
-      sentinelKQL: a.hypotheses?.sentinelKQL || '',
-      comments: a.comments || a.hypotheses?.comments || []
-    }));
+
+    if (data?.length) {
+      return data.map(mapAssignmentRow);
+    }
+
+    // Fallback: data imported into hypotheses only (assignments empty or blocked by RLS)
+    const hypotheses = await getAllHypotheses();
+    return hypotheses
+      .filter(h => h.month)
+      .map(mapHypothesisAsAssignment);
   } catch (err) {
     console.error('Exception fetching assignments:', err);
     return [];
@@ -181,20 +221,31 @@ export const getAllAssignments = async () => {
 };
 
 export const updateAssignment = async (id, data) => {
-  const { comments, created_at, updated_at, id: assignId, ...updateData } = data;
-  
+  const { comments, created_at, updated_at, id: assignId, hypothesis_id, _source, ...updateData } = data;
+
   const { data: updated, error } = await supabase
     .from('assignments')
     .update({ ...updateData, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single();
-    
-  if (error) {
+
+  if (!error) return updated;
+
+  // Legacy path: campaign row lives on hypotheses
+  const { data: hypoUpdated, error: hypoError } = await supabase
+    .from('hypotheses')
+    .update({ ...updateData, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (hypoError) {
     console.error('Error updating assignment:', error);
-    throw error;
+    console.error('Error updating hypothesis fallback:', hypoError);
+    throw hypoError;
   }
-  return updated;
+  return hypoUpdated;
 };
 
 export const deleteAssignment = async (id) => {

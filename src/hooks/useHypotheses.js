@@ -21,8 +21,8 @@ export const useHypotheses = () => {
     refresh();
   }, [refresh]);
 
-  const add = async (data) => {
-    await storage.addHypothesis(data);
+  const add = async (data, options) => {
+    await storage.addHypothesis(data, options);
     await refresh();
   };
 

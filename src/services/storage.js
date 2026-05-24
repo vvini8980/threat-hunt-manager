@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 // ── Helpers ──────────────────────────────────
-const normalizeMonth = (monthStr) => {
+export const normalizeMonth = (monthStr) => {
   if (!monthStr) return new Date().toISOString().slice(0, 7);
   if (/^\d{4}-\d{2}$/.test(monthStr)) return monthStr;
   
@@ -26,6 +26,51 @@ const normalizeMonth = (monthStr) => {
   return monthStr;
 };
 
+const hypoNameKey = (name) => (name || '').trim().toLowerCase();
+
+const rowTimestamp = (row) => {
+  const t = row?.updated_at || row?.updatedAt || row?.created_at || row?.createdAt;
+  return t ? new Date(t).getTime() : 0;
+};
+
+/** One row per hypothesis name; newest updated_at wins. */
+export const dedupeHypothesesByName = (rows = []) => {
+  const groups = new Map();
+
+  for (const row of rows) {
+    const key = hypoNameKey(row.hypoName) || row.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  const unique = [];
+  for (const group of groups.values()) {
+    group.sort((a, b) => rowTimestamp(b) - rowTimestamp(a));
+    unique.push(group[0]);
+  }
+
+  return unique.sort((a, b) =>
+    (a.hypoName || '').localeCompare(b.hypoName || '', undefined, { sensitivity: 'base' })
+  );
+};
+
+export const getHypothesisByName = async (hypoName) => {
+  const key = hypoNameKey(hypoName);
+  if (!key) return null;
+
+  const { data, error } = await supabase
+    .from('hypotheses')
+    .select('id, hypoName, updated_at, created_at');
+
+  if (error) return null;
+
+  const matches = (data || []).filter(h => hypoNameKey(h.hypoName) === key);
+  if (!matches.length) return null;
+
+  matches.sort((a, b) => rowTimestamp(b) - rowTimestamp(a));
+  return matches[0];
+};
+
 // ── CRUD - Hypotheses Library ─────────────────
 
 export const getAllHypotheses = async () => {
@@ -39,10 +84,27 @@ export const getAllHypotheses = async () => {
       return [];
     }
     
-    return (data || []).map(h => ({
+    const rows = (data || []).map(h => ({
       ...h,
-      month: normalizeMonth(h.month)
+      month: normalizeMonth(h.month),
     }));
+
+    const unique = dedupeHypothesesByName(rows);
+    const keepIds = new Set(unique.map(h => h.id));
+    const duplicateIds = rows.filter(h => !keepIds.has(h.id)).map(h => h.id);
+
+    if (duplicateIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('hypotheses')
+        .delete()
+        .in('id', duplicateIds);
+
+      if (deleteError) {
+        console.warn('Could not remove duplicate hypotheses from database:', deleteError.message);
+      }
+    }
+
+    return unique;
   } catch (err) {
     console.error('Exception fetching hypotheses:', err);
     return [];
@@ -60,14 +122,9 @@ export const getHypothesisById = async (id) => {
   return { ...data, month: normalizeMonth(data.month) };
 };
 
-export const addHypothesis = async (data) => {
-  // Strip out UI-only or nested arrays like comments if they were passed
-  const { id, comments, createdAt, updatedAt, ...insertData } = data;
-  
-  // Extract assignment specific tracking fields
-  const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = insertData;
-  
-  const trackingFields = month ? {
+const buildTrackingFields = ({ clientName, assignedAnalyst, month, status, planned, isGeneral, result }) => {
+  if (!month) return null;
+  return {
     month: normalizeMonth(month),
     clientName: clientName || '',
     assignedAnalyst: assignedAnalyst || '',
@@ -75,46 +132,148 @@ export const addHypothesis = async (data) => {
     planned: planned || '',
     isGeneral: isGeneral || false,
     result: result || '',
-  } : {};
+  };
+};
 
-  // 1. Insert into permanent hypotheses catalog (include tracking fields when assignments RLS blocks inserts)
-  const { data: inserted, error } = await supabase
-    .from('hypotheses')
-    .insert([{ ...hypoData, ...trackingFields }])
-    .select()
-    .single();
-    
-  if (error) {
-    console.error('Error adding hypothesis:', error);
-    throw error;
+/** Create or update monthly assignment row for a hypothesis */
+export const upsertAssignmentForMonth = async (hypothesisId, trackingFields) => {
+  if (!hypothesisId || !trackingFields?.month) return null;
+
+  const payload = {
+    hypothesis_id: hypothesisId,
+    ...trackingFields,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existing, error: findError } = await supabase
+    .from('assignments')
+    .select('id')
+    .eq('hypothesis_id', hypothesisId)
+    .eq('month', trackingFields.month)
+    .maybeSingle();
+
+  if (findError) {
+    console.warn('Assignment lookup failed:', findError.message);
   }
 
-  // 2. Link a tracking assignment record when month is provided
-  if (month) {
-    const { error: assignError } = await supabase
+  if (existing?.id) {
+    const { data, error } = await supabase
       .from('assignments')
-      .insert([{
-        hypothesis_id: inserted.id,
-        ...trackingFields,
-      }]);
-      
-    if (assignError) {
-      console.warn('Assignment row not created (check Supabase RLS on assignments):', assignError.message);
-    }
+      .update(payload)
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (!error) return data;
+  } else {
+    const { data, error } = await supabase
+      .from('assignments')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (!error) return data;
+    console.warn('Assignment insert failed (check Supabase RLS):', error?.message);
   }
-  
-  return inserted;
+
+  // Legacy fallback: store campaign fields on hypotheses when assignments blocked
+  await supabase
+    .from('hypotheses')
+    .update({
+      month: trackingFields.month,
+      clientName: trackingFields.clientName,
+      assignedAnalyst: trackingFields.assignedAnalyst,
+      status: trackingFields.status,
+      planned: trackingFields.planned,
+      isGeneral: trackingFields.isGeneral,
+      result: trackingFields.result,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', hypothesisId);
+
+  return null;
+};
+
+/**
+ * @param {object} data - hypothesis + optional campaign fields
+ * @param {{ campaign?: boolean }} options - campaign=true for lead monthly uploads
+ */
+export const addHypothesis = async (data, { campaign = false } = {}) => {
+  const { id, comments, createdAt, updatedAt, ...insertData } = data;
+  const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = insertData;
+
+  const trackingFields = buildTrackingFields({
+    clientName, assignedAnalyst, month, status, planned, isGeneral, result,
+  });
+  const isCampaign = campaign && trackingFields;
+
+  let hypothesisId;
+
+  const existing = hypoData.hypoName ? await getHypothesisByName(hypoData.hypoName) : null;
+
+  if (existing) {
+    hypothesisId = existing.id;
+    const { error: updateError } = await supabase
+      .from('hypotheses')
+      .update({ ...hypoData, updated_at: new Date().toISOString() })
+      .eq('id', hypothesisId);
+
+    if (updateError) {
+      console.error('Error updating library hypothesis:', updateError);
+      throw updateError;
+    }
+  } else {
+    const insertPayload = isCampaign
+      ? { ...hypoData, ...trackingFields }
+      : { ...hypoData };
+
+    const { data: inserted, error } = await supabase
+      .from('hypotheses')
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding hypothesis:', error);
+      throw error;
+    }
+    hypothesisId = inserted.id;
+  }
+
+  if (isCampaign) {
+    await upsertAssignmentForMonth(hypothesisId, trackingFields);
+  }
+
+  return getHypothesisById(hypothesisId);
 };
 
 export const updateHypothesis = async (id, data) => {
   const { comments, created_at, updated_at, id: hypoId, createdAt, updatedAt, ...updateData } = data;
   
-  // Extract assignment fields if passed, to ensure clean update of library columns
   const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = updateData;
+
+  const payload = {
+    ...hypoData,
+    updated_at: new Date().toISOString(),
+  };
+
+  const trackingFields = buildTrackingFields({
+    clientName, assignedAnalyst, month, status, planned, isGeneral, result,
+  });
+
+  if (trackingFields) {
+    if (clientName !== undefined) payload.clientName = clientName;
+    if (assignedAnalyst !== undefined) payload.assignedAnalyst = assignedAnalyst;
+    if (status !== undefined) payload.status = status;
+    if (planned !== undefined) payload.planned = planned;
+    if (isGeneral !== undefined) payload.isGeneral = isGeneral;
+    if (result !== undefined) payload.result = result;
+    payload.month = trackingFields.month;
+  }
 
   const { data: updated, error } = await supabase
     .from('hypotheses')
-    .update({ ...hypoData, updated_at: new Date().toISOString() })
+    .update(payload)
     .eq('id', id)
     .select()
     .single();
@@ -123,6 +282,11 @@ export const updateHypothesis = async (id, data) => {
     console.error('Error updating hypothesis:', error);
     throw error;
   }
+
+  if (trackingFields) {
+    await upsertAssignmentForMonth(id, trackingFields);
+  }
+
   return updated;
 };
 
@@ -193,6 +357,26 @@ const mapHypothesisAsAssignment = (h) => ({
   comments: h.comments || [],
   _source: 'hypothesis',
 });
+
+export const getAssignmentForHypothesisMonth = async (hypothesisId, month) => {
+  const normalized = normalizeMonth(month);
+  if (!hypothesisId || !normalized) return null;
+
+  const { data, error } = await supabase
+    .from('assignments')
+    .select('*')
+    .eq('hypothesis_id', hypothesisId)
+    .eq('month', normalized)
+    .maybeSingle();
+
+  if (!error && data) return { ...data, month: normalized };
+
+  const hypo = await getHypothesisById(hypothesisId);
+  if (hypo && normalizeMonth(hypo.month) === normalized) {
+    return mapHypothesisAsAssignment(hypo);
+  }
+  return null;
+};
 
 export const getAllAssignments = async () => {
   try {

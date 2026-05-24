@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useToastContext } from '../context/ToastContext';
+import { ResultCell } from '../components/Common/StatusBadge';
+
 const getStatusColor = (status) => {
   switch (status) {
     case 'Active': return 'bg-blue-500';
@@ -57,16 +59,6 @@ const getDropdownStyle = (status) => {
     default:
       return 'bg-gray-500/10 text-gray-400 border-gray-500/30 hover:bg-gray-500/20';
   }
-};
-
-const ResultBadge = ({ result }) => {
-  if (!result || result === 'Undetermined') return null;
-  const isTP = result === 'TP';
-  return (
-    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${isTP ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
-      {result}
-    </span>
-  );
 };
 
 const CustomTooltip = ({ active, payload }) => {
@@ -119,10 +111,18 @@ function Campaigns() {
 
   useEffect(() => {
     if (selectedHypo) {
-      const updated = hypotheses.find(h => h.id === selectedHypo.id);
+      const updated = assignments.find(a => a.id === selectedHypo.id);
       if (updated) setSelectedHypo(updated);
     }
-  }, [hypotheses, selectedHypo]);
+  }, [assignments, selectedHypo]);
+
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const isCurrentMonth = selectedMonth === currentMonthKey;
+
+  const editCampaignHref = (row) => {
+    const hypoId = row.hypothesis_id || row.id;
+    return `/edit/${hypoId}?month=${selectedMonth}&from=campaigns`;
+  };
 
 
 
@@ -274,8 +274,25 @@ function Campaigns() {
       {/* Header & Month Selector */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#2a2d3e] pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-4">Monthly Campaigns</h2>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <h2 className="text-3xl font-bold text-white mb-2">Monthly Campaigns</h2>
+          <p className="text-sm text-gray-400 mb-4 max-w-xl">
+            Current month hunting plan — lead uploads assignments here. The Hypothesis Library holds all hunt definitions.
+          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
+            {!isCurrentMonth && (
+              <button
+                type="button"
+                onClick={() => setSelectedMonth(currentMonthKey)}
+                className="px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-500/50 text-indigo-300 hover:bg-indigo-500/10"
+              >
+                Jump to current month
+              </button>
+            )}
+            {isCurrentMonth && (
+              <span className="px-3 py-1 text-xs font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Viewing current month
+              </span>
+            )}
             <div className="flex items-center gap-4 bg-[#1a1d27] border border-[#2a2d3e] rounded-xl p-2 shadow-lg">
               <button 
                 onClick={handlePrevious}
@@ -445,7 +462,7 @@ function Campaigns() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/add?type=general')}
+              onClick={() => navigate(`/add?type=general&month=${selectedMonth}&from=campaigns`)}
               className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg"
             >
               + Add Item
@@ -497,6 +514,91 @@ function Campaigns() {
         )}
       </div>
 
+      {/* Full monthly assignment roster */}
+      <div className="mb-10">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              📊 {formatMonth(selectedMonth)} — Hunt Assignments
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              All hunts scheduled this month (general + individual). Use Lead Import to bulk upload.
+            </p>
+          </div>
+          <span className="px-3 py-1 bg-[#252840] text-gray-300 text-xs font-bold rounded-full border border-[#2a2d3e]">
+            {monthHypotheses.length} total
+          </span>
+        </div>
+
+        {monthHypotheses.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Hypothesis</th>
+                    <th className="px-4 py-3 font-semibold">MITRE</th>
+                    <th className="px-4 py-3 font-semibold">Type</th>
+                    <th className="px-4 py-3 font-semibold">Client</th>
+                    <th className="px-4 py-3 font-semibold">Analyst</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Result</th>
+                    <th className="px-4 py-3 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#2a2d3e]">
+                  {monthHypotheses.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      className={`transition-colors hover:bg-[#252840] ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHypo(row)}
+                          className="text-left font-medium text-white hover:text-indigo-300 max-w-[220px] truncate block"
+                          title={row.hypoName}
+                        >
+                          {row.hypoName || 'Untitled'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-indigo-400 text-xs">{row.mitreId || '--'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${row.isGeneral ? 'border-indigo-500/40 text-indigo-300 bg-indigo-500/10' : 'border-teal-500/40 text-teal-300 bg-teal-500/10'}`}>
+                          {row.isGeneral ? 'General' : 'Individual'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">{row.clientName || '—'}</td>
+                      <td className="px-4 py-3 text-indigo-300">{row.assignedAnalyst || '—'}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={row.status || 'Pending'} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <ResultCell result={row.result} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => navigate(editCampaignHref(row))}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[#2a2d3e] bg-[#1a1d27]/50 p-10 text-center">
+            <p className="text-gray-500 text-sm">No hunts for {formatMonth(selectedMonth)} yet.</p>
+            <p className="text-gray-600 text-xs mt-2">Use Lead Import above to upload this month&apos;s plan.</p>
+          </div>
+        )}
+      </div>
+
       {/* Individual Hunts Table */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -514,7 +616,7 @@ function Campaigns() {
               <span>Export Table</span>
             </button>
             <button
-              onClick={() => navigate('/add?type=individual')}
+              onClick={() => navigate(`/add?type=individual&month=${selectedMonth}&from=campaigns`)}
               className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg"
             >
               + Add Assignment
@@ -527,9 +629,12 @@ function Campaigns() {
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Client Name</th>
-                    <th className="px-4 py-3 font-semibold">Assigned Analyst</th>
+                    <th className="px-4 py-3 font-semibold">Hypothesis</th>
+                    <th className="px-4 py-3 font-semibold">MITRE</th>
+                    <th className="px-4 py-3 font-semibold">Client</th>
+                    <th className="px-4 py-3 font-semibold">Analyst</th>
                     <th className="px-4 py-3 font-semibold">Status / Date</th>
+                    <th className="px-4 py-3 font-semibold text-right">Edit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2a2d3e]">
@@ -538,6 +643,10 @@ function Campaigns() {
                       key={hypo.id}
                       className={`transition-colors ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
                     >
+                      <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate" title={hypo.hypoName}>
+                        {hypo.hypoName || '--'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-indigo-400">{hypo.mitreId || '--'}</td>
                       <td className="px-4 py-3 text-gray-300 font-bold">
                         {hypo.clientName ? (
                           <span className="flex items-center gap-2">🏢 {hypo.clientName}</span>
@@ -576,6 +685,16 @@ function Campaigns() {
                             />
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => navigate(editCampaignHref(hypo))}
+                          className="p-2 rounded-md text-gray-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                          title="Edit full details"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -641,7 +760,7 @@ function Campaigns() {
       <HypoDetail
         hypothesis={selectedHypo}
         onClose={() => setSelectedHypo(null)}
-        onEdit={() => selectedHypo && navigate(`/edit/${selectedHypo.hypothesis_id || selectedHypo.id}`)}
+        onEdit={() => selectedHypo && navigate(editCampaignHref(selectedHypo))}
         currentStatus={selectedHypo?.status}
         onStatusChange={handleStatusChange}
         comments={selectedHypo?.comments}

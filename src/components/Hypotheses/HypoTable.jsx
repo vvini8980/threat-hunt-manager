@@ -1,26 +1,39 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Edit, Shield, Trash2 } from 'lucide-react'
-import { ResultBadge, StatusBadge } from '../Common/StatusBadge'
+import { ResultCell, StatusBadge } from '../Common/StatusBadge'
 
-const COLUMNS = [
+const LIBRARY_COLUMNS = [
   { key: 'slno', label: 'Sl no' },
   { key: 'hypoName', label: 'Hypothesis Name' },
   { key: 'mitreId', label: 'MITRE ID' },
   { key: 'subTechnique', label: 'Sub Technique' },
   { key: 'tactic', label: 'Tactic' },
-  { key: 'month', label: 'Month' },
   { key: 'description', label: 'Description' },
   { key: 'huntingLogic', label: 'Hunting Logic' },
   { key: 'splunkSPL', label: 'Splunk Query' },
   { key: 'qradarAQL', label: 'QRadar Query' },
   { key: 'sentinelKQL', label: 'Sentinel Query' },
   { key: 'socDetectionRule', label: 'SOC/Usecase Rule' },
-  { key: 'result', label: 'Results TP/FP/Undetermined' },
+  { key: 'result', label: 'Result' },
 ]
 
-function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
-  const [sort, setSort] = useState({ key: 'month', direction: 'desc' })
+const CAMPAIGN_COLUMNS = [
+  ...LIBRARY_COLUMNS.slice(0, 5),
+  { key: 'month', label: 'Month' },
+  { key: 'clientName', label: 'Client' },
+  { key: 'assignedAnalyst', label: 'Analyst' },
+  { key: 'status', label: 'Status' },
+  { key: 'result', label: 'Result' },
+  ...LIBRARY_COLUMNS.slice(5),
+]
+
+function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete, variant = 'library' }) {
+  const COLUMNS = variant === 'campaign' ? CAMPAIGN_COLUMNS : LIBRARY_COLUMNS
+  const [sort, setSort] = useState({
+    key: variant === 'campaign' ? 'month' : 'hypoName',
+    direction: variant === 'campaign' ? 'desc' : 'asc',
+  })
   const [filter, setFilter] = useState('')
 
   const visibleHypotheses = useMemo(() => {
@@ -149,9 +162,25 @@ function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
                     {hypothesis.tactic || '--'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
-                  {hypothesis.month || '--'}
-                </td>
+                {variant === 'campaign' && (
+                  <>
+                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                      {hypothesis.month || '--'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
+                      {hypothesis.clientName || '--'}
+                    </td>
+                    <td className="px-4 py-3 text-indigo-300 whitespace-nowrap">
+                      {hypothesis.assignedAnalyst || '--'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {hypothesis.status ? <StatusBadge status={hypothesis.status} /> : '--'}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <ResultCell result={hypothesis.result} />
+                    </td>
+                  </>
+                )}
                 <td className="max-w-[200px] px-4 py-3 text-xs text-gray-400">
                   <span className="line-clamp-2" title={hypothesis.description}>
                     {hypothesis.description || '--'}
@@ -182,9 +211,11 @@ function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
                     {hypothesis.socDetectionRule || '--'}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  {hypothesis.result ? <ResultBadge result={hypothesis.result} /> : <span className="text-gray-600">--</span>}
-                </td>
+                {variant === 'library' && (
+                  <td className="px-4 py-3 align-top min-w-[100px]">
+                    <ResultCell result={hypothesis.result} />
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
                     <button

@@ -49,28 +49,12 @@ function Import() {
     setImportTotal(validRows.length);
     setImportProgress(0);
 
-    // Maintain a set of all names (lowercase) to track duplicates
-    const existingNames = new Set(hypotheses.map(h => h.hypoName?.toLowerCase()));
-
-    const getUniqueName = (baseName) => {
-      let newName = baseName;
-      let counter = 1;
-      while (existingNames.has(newName.toLowerCase())) {
-        newName = `${baseName} (Copy ${counter})`;
-        counter++;
-      }
-      existingNames.add(newName.toLowerCase());
-      return newName;
-    };
-
     try {
       for (let i = 0; i < validRows.length; i++) {
         setImportProgress(i + 1);
-        
         const hypToImport = { ...validRows[i] };
-        hypToImport.hypoName = getUniqueName(hypToImport.hypoName);
-
-        await addHypothesis(hypToImport);
+        const isCampaignRow = Boolean(hypToImport.month);
+        await addHypothesis(hypToImport, { campaign: isCampaignRow });
       }
       
       await refresh();

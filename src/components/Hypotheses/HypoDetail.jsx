@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Edit, X, Trash2 } from 'lucide-react'
 import { QueryTabs } from '../Common/QueryTabs'
-import { ResultBadge, StatusBadge } from '../Common/StatusBadge'
+import { ResultCell, StatusBadge } from '../Common/StatusBadge'
 import { useToastContext } from '../../context/ToastContext'
 import { useHypotheses } from '../../hooks/useHypotheses'
 import { useNavigate } from 'react-router-dom'
@@ -168,7 +168,7 @@ function HypoDetail({
 
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusBadge status={hypothesis.status} />
-              <ResultBadge result={hypothesis.result} />
+              <ResultCell result={hypothesis.result} />
             </div>
           </div>
 

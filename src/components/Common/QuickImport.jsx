@@ -133,12 +133,17 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', onDone }
 
       const valid = rows
         .map(parseRow)
-        .map(h => ({
-          ...h,
-          month: h.month || defaultMonth || new Date().toISOString().slice(0, 7),
-          status: h.status || 'Planned',
-          isGeneral: h.isGeneral || false,
-        }))
+        .map(h => {
+          if (mode === 'lead') {
+            return {
+              ...h,
+              month: h.month || defaultMonth || new Date().toISOString().slice(0, 7),
+              status: h.status || 'Planned',
+              isGeneral: h.isGeneral || false,
+            };
+          }
+          return h;
+        })
         .filter(h => h.hypoName && h.mitreId);
 
       if (valid.length === 0) {
@@ -150,11 +155,16 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', onDone }
       setProgress({ done: 0, total: valid.length });
 
       for (let i = 0; i < valid.length; i++) {
-        await addHypothesis(valid[i]);
+        await addHypothesis(valid[i], { campaign: mode === 'lead' });
         setProgress({ done: i + 1, total: valid.length });
       }
 
-      showToast(`✅ ${valid.length} hypotheses imported successfully!`, 'success');
+      showToast(
+        mode === 'lead'
+          ? `✅ ${valid.length} monthly assignments imported!`
+          : `✅ ${valid.length} hypotheses added to library!`,
+        'success',
+      );
       setImporting(false);
       if (onDone) onDone();
 

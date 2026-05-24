@@ -294,7 +294,7 @@ function Campaigns() {
 
 
   return (
-    <section className="min-h-full bg-bg-primary p-6 text-white max-w-6xl mx-auto pb-24">
+    <section className="min-h-full bg-bg-primary p-6 text-white pb-24">
       
       {/* Header & Month Selector */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#2a2d3e] pb-6">

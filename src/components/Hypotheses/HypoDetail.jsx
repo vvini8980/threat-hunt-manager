@@ -23,6 +23,7 @@ function HypoDetail({
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState({})
   const [isSaving, setIsSaving] = useState(false)
+  const [commentResult, setCommentResult] = useState('Neutral')
 
   const { showToast } = useToastContext()
   const { remove, update } = useHypotheses()
@@ -60,8 +61,20 @@ function HypoDetail({
 
     if (!text) return
 
-    onAddComment?.(hypothesis.id, text, analystName)
+    let finalResult = null;
+    let finalText = text;
+
+    if (commentResult === 'TP') {
+      finalResult = 'TP';
+      finalText = `[TP] ${text}`;
+    } else if (commentResult === 'FP') {
+      finalResult = 'FP';
+      finalText = `[FP] ${text}`;
+    }
+
+    onAddComment?.(hypothesis.id, finalText, analystName, finalResult)
     setCommentText('')
+    setCommentResult('Neutral')
     showToast('Comment added', 'success')
   }
 
@@ -382,6 +395,16 @@ function HypoDetail({
                 {displayComments.length > 0 ? (
                   displayComments.map(comment => {
                     const analystName = comment.analyst || 'Analyst'
+                    let displayText = comment.text || '';
+                    let badge = null;
+
+                    if (displayText.startsWith('[TP] ')) {
+                      badge = <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-bold text-green-400">TP</span>;
+                      displayText = displayText.substring(5);
+                    } else if (displayText.startsWith('[FP] ')) {
+                      badge = <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-bold text-red-400">FP</span>;
+                      displayText = displayText.substring(5);
+                    }
 
                     return (
                       <div
@@ -393,9 +416,10 @@ function HypoDetail({
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm leading-6 text-gray-200">
-                            {comment.text}
+                            {displayText}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 items-center">
+                            {badge}
                             <span className="font-medium text-gray-400">
                               {analystName}
                             </span>
@@ -417,19 +441,42 @@ function HypoDetail({
                   value={commentText}
                   onChange={event => setCommentText(event.target.value)}
                 />
-                <div className="flex gap-3">
-                  <input
-                    className="h-10 min-w-0 flex-1 rounded-lg border border-[#2a2d3e] bg-[#1a1d27] px-3 text-sm text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-indigo-500"
-                    placeholder="Analyst name"
-                    value={analyst}
-                    onChange={event => setAnalyst(event.target.value)}
-                  />
-                  <button
-                    onClick={handleAddComment}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
-                  >
-                    Add Comment
-                  </button>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex rounded-lg border border-[#2a2d3e] bg-[#1a1d27] p-1 shrink-0">
+                    {['TP', 'FP', 'Neutral'].map((res) => (
+                      <button
+                        key={res}
+                        onClick={() => setCommentResult(res)}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          commentResult === res
+                            ? res === 'TP'
+                              ? 'bg-green-500/20 text-green-400'
+                              : res === 'FP'
+                              ? 'bg-red-500/20 text-red-400'
+                              : 'bg-gray-600 text-white'
+                            : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        {res}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-1 min-w-[200px] gap-3">
+                    <input
+                      className="h-9 min-w-0 flex-1 rounded-lg border border-[#2a2d3e] bg-[#1a1d27] px-3 text-sm text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-indigo-500"
+                      placeholder="Analyst name"
+                      value={analyst}
+                      onChange={event => setAnalyst(event.target.value)}
+                    />
+                    <button
+                      onClick={handleAddComment}
+                      className="h-9 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shrink-0"
+                    >
+                      Add Comment
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>

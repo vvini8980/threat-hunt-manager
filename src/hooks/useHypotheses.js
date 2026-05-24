@@ -46,8 +46,11 @@ export const useHypotheses = () => {
     await refresh();
   };
 
-  const addComment = async (id, text, analyst) => {
+  const addComment = async (id, text, analyst, resultValue) => {
     await storage.addComment(id, text, analyst);
+    if (resultValue && (resultValue === 'TP' || resultValue === 'FP')) {
+      await storage.updateHypothesis(id, { result: resultValue });
+    }
     await refresh();
   };
 

@@ -150,17 +150,23 @@ function Campaigns() {
 
 
 
-  // Normalize legacy "Month YYYY" to "YYYY-MM" for comparison
+  // Normalize legacy "Month YYYY" or Excel Serial to "YYYY-MM" for comparison
   const toYYYYMM = (m) => {
     if (!m) return '';
-    if (m.match(/^\d{4}-\d{2}$/)) return m;
+    if (!isNaN(m) && Number(m) > 10000) {
+      const utcDays = Math.floor(Number(m) - 25569);
+      const d = new Date(utcDays * 86400 * 1000);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    }
+    const str = String(m);
+    if (str.match(/^\d{4}-\d{2}$/)) return str;
     try {
-      const realDate = new Date(m);
+      const realDate = new Date(str);
       if (!isNaN(realDate)) {
         return `${realDate.getFullYear()}-${String(realDate.getMonth() + 1).padStart(2, '0')}`;
       }
     } catch (e) {}
-    return m;
+    return str;
   };
 
   const allMonths = Array.from(
@@ -224,11 +230,11 @@ function Campaigns() {
     }
   };
 
-  const handleAddComment = async (id, text, analyst) => {
+  const handleAddComment = async (id, text, analyst, resultValue) => {
     try {
       const target = assignments.find(a => a.id === id);
       const hypoId = target?.hypothesis_id || id;
-      await addComment(hypoId, text, analyst);
+      await addComment(hypoId, text, analyst, resultValue);
       refresh();
     } catch (error) {
       showToast('Failed to add comment', 'error');
@@ -236,7 +242,7 @@ function Campaigns() {
   };
 
   // Derive stats based on selectedMonth filtering
-  const monthHypotheses = assignments.filter(h => h.month === selectedMonth);
+  const monthHypotheses = assignments.filter(h => toYYYYMM(h.month) === selectedMonth);
 
   // All assignments for the month
   const campaignAssignments = monthHypotheses;

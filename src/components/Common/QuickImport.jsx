@@ -249,7 +249,21 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', monthlyH
                   { key: 'assignedAnalyst', label: 'Assigned Analyst' },
                   { key: 'month', label: 'Month' },
                   { key: 'status', label: 'Status' }
-                ] : null}
+                ] : [
+                  { key: 'hypoName', label: 'Hypothesis Name', required: true },
+                  { key: 'mitreId', label: 'MITRE ID', required: true },
+                  { key: 'subTechnique', label: 'Sub Technique' },
+                  { key: 'tactic', label: 'Tactic' },
+                  { key: 'month', label: 'Month' },
+                  { key: 'description', label: 'Description' },
+                  { key: 'huntingLogic', label: 'Hunting Logic' },
+                  { key: 'socDetectionRule', label: 'SOC Rule' },
+                  { key: 'splunkSPL', label: 'Splunk Query' },
+                  { key: 'qradarAQL', label: 'QRadar Query' },
+                  { key: 'sentinelKQL', label: 'Sentinel Query' },
+                  { key: 'result', label: 'Result' },
+                  { key: 'commentsText', label: 'Comments' }
+                ]}
               />
             </div>
           </div>

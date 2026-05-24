@@ -1,12 +1,22 @@
 import { supabase } from './supabase';
 
 // ── Helpers ──────────────────────────────────
-export const normalizeMonth = (monthStr) => {
-  if (!monthStr) return new Date().toISOString().slice(0, 7);
-  if (/^\d{4}-\d{2}$/.test(monthStr)) return monthStr;
+export const normalizeMonth = (monthValue) => {
+  if (!monthValue) return new Date().toISOString().slice(0, 7);
+  
+  // Handle Excel serial date numbers (e.g., 46165)
+  if (!isNaN(monthValue) && Number(monthValue) > 10000) {
+    const utcDays = Math.floor(Number(monthValue) - 25569);
+    const d = new Date(utcDays * 86400 * 1000);
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${mm}`;
+  }
+
+  const str = String(monthValue);
+  if (/^\d{4}-\d{2}$/.test(str)) return str;
   
   const currentYear = new Date().getFullYear();
-  const lower = monthStr.toLowerCase().trim();
+  const lower = str.toLowerCase().trim();
   const monthMap = {
     jan: '01', january: '01', feb: '02', february: '02',
     mar: '03', march: '03', apr: '04', april: '04',
@@ -18,12 +28,12 @@ export const normalizeMonth = (monthStr) => {
   
   if (monthMap[lower]) return `${currentYear}-${monthMap[lower]}`;
   
-  const d = new Date(monthStr);
+  const d = new Date(str);
   if (!isNaN(d.getTime())) {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     return `${d.getFullYear()}-${mm}`;
   }
-  return monthStr;
+  return str;
 };
 
 const hypoNameKey = (name) => (name || '').trim().toLowerCase();
@@ -132,7 +142,7 @@ const buildTrackingFields = ({ clientName, assignedAnalyst, month, status, plann
  * @param {{ campaign?: boolean }} options - campaign=true for lead monthly uploads
  */
 export const addHypothesis = async (data, { campaign = false } = {}) => {
-  const { id, comments, createdAt, updatedAt, ...insertData } = data;
+  const { id, comments, commentsText, createdAt, updatedAt, ...insertData } = data;
   const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = insertData;
 
   const trackingFields = buildTrackingFields({
@@ -149,6 +159,8 @@ export const addHypothesis = async (data, { campaign = false } = {}) => {
     
     // Prevent empty columns in the spreadsheet from wiping out existing database data
     const safeUpdateData = { updated_at: new Date().toISOString() };
+    if (month) safeUpdateData.month = normalizeMonth(month);
+    
     Object.keys(hypoData).forEach(key => {
       if (hypoData[key] !== '' && hypoData[key] !== null && hypoData[key] !== undefined) {
         safeUpdateData[key] = hypoData[key];
@@ -167,7 +179,7 @@ export const addHypothesis = async (data, { campaign = false } = {}) => {
   } else {
     const insertPayload = isCampaign
       ? { ...hypoData, ...trackingFields }
-      : { ...hypoData };
+      : { ...hypoData, month: normalizeMonth(month) };
 
     const { data: inserted, error } = await supabase
       .from('hypotheses')
@@ -188,7 +200,7 @@ export const addHypothesis = async (data, { campaign = false } = {}) => {
 };
 
 export const updateHypothesis = async (id, data) => {
-  const { comments, created_at, updated_at, id: hypoId, createdAt, updatedAt, ...updateData } = data;
+  const { comments, commentsText, created_at, updated_at, id: hypoId, createdAt, updatedAt, ...updateData } = data;
   
   const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, ...hypoData } = updateData;
 
@@ -208,7 +220,10 @@ export const updateHypothesis = async (id, data) => {
     if (planned !== undefined) payload.planned = planned;
     if (isGeneral !== undefined) payload.isGeneral = isGeneral;
     if (result !== undefined) payload.result = result;
-    payload.month = trackingFields.month;
+  }
+  
+  if (month !== undefined) {
+    payload.month = normalizeMonth(month);
   }
 
   const { data: updated, error } = await supabase
@@ -342,7 +357,7 @@ export const addAssignment = async (assignmentData) => {
   const { clientName, assignedAnalyst, month, status, planned, isGeneral, result, hypothesis_id } = assignmentData;
   const payload = {
     hypothesis_id,
-    month,
+    month: normalizeMonth(month),
     clientName: clientName || '',
     assignedAnalyst: assignedAnalyst || '',
     status: status || 'Pending',
@@ -366,6 +381,10 @@ export const addAssignment = async (assignmentData) => {
 
 export const updateAssignment = async (id, data) => {
   const { comments, created_at, updated_at, id: assignId, hypothesis_id, _source, ...updateData } = data;
+
+  if (updateData.month) {
+    updateData.month = normalizeMonth(updateData.month);
+  }
 
   const { data: updated, error } = await supabase
     .from('assignments')
@@ -432,15 +451,38 @@ export const getStats = (all = []) => {
 
 export const getMonthlyStats = (all = []) => {
   const months = {};
+
+  const toYYYYMM = (m) => {
+    if (!m) return '';
+    if (!isNaN(m) && Number(m) > 10000) {
+      const utcDays = Math.floor(Number(m) - 25569);
+      const d = new Date(utcDays * 86400 * 1000);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    }
+    const str = String(m);
+    if (str.match(/^\d{4}-\d{2}$/)) return str;
+    try {
+      const realDate = new Date(str);
+      if (!isNaN(realDate)) {
+        return `${realDate.getFullYear()}-${String(realDate.getMonth() + 1).padStart(2, '0')}`;
+      }
+    } catch (e) {}
+    return str;
+  };
+
   all.forEach(h => {
     if (!h.month) return;
-    if (!months[h.month]) {
-      months[h.month] = { month: h.month, total: 0, tp: 0, fp: 0 };
+    const normMonth = toYYYYMM(h.month);
+    if (!normMonth) return;
+
+    if (!months[normMonth]) {
+      months[normMonth] = { month: normMonth, total: 0, tp: 0, fp: 0 };
     }
-    months[h.month].total++;
-    if (h.result === 'TP') months[h.month].tp++;
-    if (h.result === 'FP') months[h.month].fp++;
+    months[normMonth].total++;
+    if (h.result === 'TP') months[normMonth].tp++;
+    if (h.result === 'FP') months[normMonth].fp++;
   });
+
   return Object.values(months).sort((a, b) =>
     a.month.localeCompare(b.month)
   );

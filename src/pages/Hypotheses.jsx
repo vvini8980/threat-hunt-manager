@@ -59,8 +59,8 @@ function Hypotheses() {
     setSelectedHypo(hypothesis)
   }
 
-  const handleAddComment = async (id, text, analyst) => {
-    await addComment(id, text, analyst)
+  const handleAddComment = async (id, text, analyst, resultValue) => {
+    await addComment(id, text, analyst, resultValue)
     await refresh()
     const updated = hypotheses.find(h => h.id === id)
     if (updated) setSelectedHypo(updated)

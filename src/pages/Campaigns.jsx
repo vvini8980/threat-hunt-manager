@@ -578,9 +578,10 @@ function Campaigns() {
                       {monthFilteredHypotheses.map((hypo, index) => (
                         <tr 
                           key={hypo.id}
-                          className={`transition-colors ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'} hover:bg-indigo-500/5`}
+                          onClick={() => setSelectedHypo(hypo)}
+                          className={`transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'} hover:bg-indigo-500/10`}
                         >
-                          <td className="px-4 py-3 text-white font-medium cursor-pointer hover:text-indigo-300" onClick={() => setSelectedHypo(hypo)}>
+                          <td className="px-4 py-3 text-white font-medium hover:text-indigo-300">
                             {hypo.hypoName}
                           </td>
                           <td className="px-4 py-3 text-gray-300 whitespace-normal">

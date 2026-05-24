@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useHypotheses } from '../hooks/useHypotheses';
 import { getMonthlyStats } from '../services/storage';
 import { exportToExcel } from '../utils/excel';
-import { generatePDFReport } from '../utils/export';
 import QuickImport from '../components/Common/QuickImport';
 import { 
   ChevronLeft, ChevronRight, Calendar, 
   Target, CheckCircle, Activity, 
   ShieldCheck, AlertTriangle,
-  FileSpreadsheet, FileText
+  FileSpreadsheet
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useToastContext } from '../context/ToastContext';
@@ -264,18 +263,6 @@ function Campaigns() {
             <FileSpreadsheet className="w-4 h-4" />
             <span>Export Excel</span>
           </button>
-          
-          <button
-            onClick={() => {
-              generatePDFReport(monthHypotheses, formatMonth(selectedMonth), stats);
-              showToast("PDF report downloaded", "info");
-            }}
-            disabled={monthHypotheses.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm shadow-lg"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Export PDF Report</span>
-          </button>
         </div>
       </div>
 
@@ -417,71 +404,58 @@ function Campaigns() {
         )}
       </div>
 
-      {/* Individual Hunts by Analyst */}
+      {/* Individual Hunts Table */}
       <div className="mb-8">
         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">👤 Individual Assignments</h3>
-        {Object.keys(byAnalyst).length > 0 ? (
-          <div className="flex flex-col gap-4">
-            {Object.entries(byAnalyst).map(([analyst, hunts]) => {
-              const done = hunts.filter(h => h.status === 'Completed' || h.status === 'Closed').length;
-              const pct = hunts.length > 0 ? Math.round((done / hunts.length) * 100) : 0;
-              return (
-                <div key={analyst} className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] overflow-hidden shadow-lg">
-                  <div className="p-4 border-b border-[#2a2d3e] flex items-center justify-between bg-[#0f1117]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-300 font-bold text-sm">
-                        {analyst.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-white">{analyst}</p>
-                        <p className="text-xs text-gray-400">{hunts.length} hunts • {done} completed</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="hidden md:flex flex-col items-end">
-                        <span className={`text-sm font-bold ${pct === 100 ? 'text-green-400' : pct > 50 ? 'text-yellow-400' : 'text-gray-400'}`}>{pct}%</span>
-                        <div className="w-24 h-1.5 bg-[#2a2d3e] rounded-full mt-1">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : pct > 50 ? 'bg-yellow-500' : 'bg-indigo-500'}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 bg-[#2a2d3e] text-gray-300 text-xs font-bold rounded-full">{hunts.length}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col divide-y divide-[#2a2d3e]">
-                    {hunts.map(hypo => (
-                      <div
-                        key={hypo.id}
-                        onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
-                        className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-[#252840] transition-colors cursor-pointer group gap-3"
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getStatusColor(hypo.status)}`} />
-                          <div>
-                            <p className="text-white text-sm font-medium group-hover:text-indigo-300 transition-colors">{hypo.hypoName}</p>
-                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                              <span className="text-xs font-mono text-indigo-400">{hypo.mitreId}</span>
-                              {hypo.clientName && (
-                                <span className="text-xs text-gray-500 bg-[#2a2d3e] px-2 py-0.5 rounded">🏢 {hypo.clientName}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 pl-5 md:pl-0">
-                          <StatusBadge status={hypo.status} />
-                          <ResultBadge result={hypo.result} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+        {individualHunts.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Planned Date/Month</th>
+                    <th className="px-4 py-3 font-semibold">Client Name</th>
+                    <th className="px-4 py-3 font-semibold">Assigned Analyst</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Hypothesis Name</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#2a2d3e]">
+                  {individualHunts.map((hypo, index) => (
+                    <tr 
+                      key={hypo.id} 
+                      className={`transition-colors hover:bg-[#252840] ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
+                    >
+                      <td className="px-4 py-3 text-gray-400">
+                        {hypo.month || '--'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">
+                        {hypo.clientName ? (
+                          <span className="flex items-center gap-1">🏢 {hypo.clientName}</span>
+                        ) : '--'}
+                      </td>
+                      <td className="px-4 py-3 text-indigo-300 font-medium">
+                        {hypo.assignedAnalyst || 'Unassigned'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={hypo.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
+                          className="font-bold text-white hover:text-indigo-400 transition-colors text-left"
+                        >
+                          {hypo.hypoName || 'Untitled Hypothesis'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-8 text-center">
+          <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-8 text-center shadow-xl">
             <p className="text-gray-500 text-sm">No individual assignments for this month.</p>
             <button
               onClick={() => navigate('/add')}

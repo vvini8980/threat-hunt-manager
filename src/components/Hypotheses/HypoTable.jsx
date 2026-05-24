@@ -4,13 +4,20 @@ import { Edit, Shield, Trash2 } from 'lucide-react'
 import { ResultBadge, StatusBadge } from '../Common/StatusBadge'
 
 const COLUMNS = [
-  { key: 'id', label: 'ID' },
-  { key: 'hypoName', label: 'Hypo Name' },
+  { key: 'slno', label: 'Sl no' },
+  { key: 'hypoName', label: 'Hypothesis Name' },
   { key: 'mitreId', label: 'MITRE ID' },
-  { key: 'subTechnique', label: 'Sub-technique' },
+  { key: 'subTechnique', label: 'Sub Technique' },
+  { key: 'tactic', label: 'Tactic' },
   { key: 'month', label: 'Month' },
-  { key: 'status', label: 'Status' },
   { key: 'description', label: 'Description' },
+  { key: 'huntingLogic', label: 'Hunting Logic' },
+  { key: 'splunkSPL', label: 'Splunk Query' },
+  { key: 'qradarAQL', label: 'QRadar Query' },
+  { key: 'sentinelKQL', label: 'Sentinel Query' },
+  { key: 'status', label: 'Results Or comments' },
+  { key: 'socDetectionRule', label: 'SOC/Usecase Rule' },
+  { key: 'result', label: 'Results TP/FP/Undetermined' },
 ]
 
 function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
@@ -77,7 +84,7 @@ function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[2000px] border-collapse text-left text-sm">
           <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400">
             <tr>
               {COLUMNS.map(column => (
@@ -116,37 +123,72 @@ function HypoTable({ hypotheses = [], onSelect, onEdit, onDelete }) {
                 }`}
               >
                 <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                  {hypothesis.id?.slice(0, 8)}
+                  {index + 1}
                 </td>
                 <td className="px-4 py-3">
                   <button
-                    className="text-left font-bold text-white transition-colors hover:text-indigo-300"
+                    className="text-left font-bold text-white transition-colors hover:text-indigo-300 max-w-[200px] truncate"
                     onClick={event => {
                       event.stopPropagation()
                       onSelect?.(hypothesis)
                     }}
+                    title={hypothesis.hypoName}
                   >
                     {hypothesis.hypoName || 'Untitled Hypothesis'}
                   </button>
                 </td>
-                <td className="px-4 py-3 font-mono font-bold text-indigo-400">
-                  {hypothesis.mitreId}
+                <td className="px-4 py-3 font-mono font-bold text-indigo-400 whitespace-nowrap">
+                  {hypothesis.mitreId || '--'}
                 </td>
-                <td className="max-w-[220px] px-4 py-3 text-xs text-gray-400">
-                  <span className="line-clamp-2">
+                <td className="max-w-[150px] px-4 py-3 text-xs text-gray-400">
+                  <span className="line-clamp-2" title={hypothesis.subTechnique}>
                     {hypothesis.subTechnique || '--'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-400">
-                  {hypothesis.month || '--'}
+                <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap" title={hypothesis.tactic}>
+                  <span className="line-clamp-2 max-w-[150px]">
+                    {hypothesis.tactic || '--'}
+                  </span>
                 </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={hypothesis.status} />
+                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                  {hypothesis.month || '--'}
                 </td>
                 <td className="max-w-[200px] px-4 py-3 text-xs text-gray-400">
                   <span className="line-clamp-2" title={hypothesis.description}>
                     {hypothesis.description || '--'}
                   </span>
+                </td>
+                <td className="max-w-[200px] px-4 py-3 text-xs text-gray-400">
+                  <span className="line-clamp-2" title={hypothesis.huntingLogic}>
+                    {hypothesis.huntingLogic || '--'}
+                  </span>
+                </td>
+                <td className="max-w-[150px] px-4 py-3 text-xs text-gray-400 font-mono">
+                  <span className="line-clamp-2" title={hypothesis.splunkSPL}>
+                    {hypothesis.splunkSPL || '--'}
+                  </span>
+                </td>
+                <td className="max-w-[150px] px-4 py-3 text-xs text-gray-400 font-mono">
+                  <span className="line-clamp-2" title={hypothesis.qradarAQL}>
+                    {hypothesis.qradarAQL || '--'}
+                  </span>
+                </td>
+                <td className="max-w-[150px] px-4 py-3 text-xs text-gray-400 font-mono">
+                  <span className="line-clamp-2" title={hypothesis.sentinelKQL}>
+                    {hypothesis.sentinelKQL || '--'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {/* Results Or Comments placeholder mapped to Status for now as discussed */}
+                  <StatusBadge status={hypothesis.status} />
+                </td>
+                <td className="max-w-[150px] px-4 py-3 text-xs text-gray-400">
+                  <span className="line-clamp-2" title={hypothesis.socDetectionRule}>
+                    {hypothesis.socDetectionRule || '--'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {hypothesis.result ? <ResultBadge result={hypothesis.result} /> : <span className="text-gray-600">--</span>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">

@@ -81,7 +81,7 @@ const CustomTooltip = ({ active, payload }) => {
 
 function Campaigns() {
   const navigate = useNavigate();
-  const { hypotheses, assignments, refresh, updateAssignment } = useHypotheses();
+  const { hypotheses, assignments, refresh, updateAssignment, add, removeAssignment } = useHypotheses();
   const { showToast } = useToastContext();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthsData, setMonthsData] = useState([]);
@@ -165,7 +165,7 @@ function Campaigns() {
 
   const handleDateChange = async (id, newDate) => {
     try {
-      await updateHypothesis(id, { planned: newDate });
+      await updateAssignment(id, { planned: newDate });
       refresh();
       showToast('Date updated successfully', 'success');
     } catch (error) {
@@ -461,143 +461,77 @@ function Campaigns() {
             <p className="text-xs text-indigo-300 mt-0.5">All analysts must complete these hunts this month</p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(`/add?type=general&month=${selectedMonth}&from=campaigns`)}
-              className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg"
-            >
-              + Add Item
-            </button>
             <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full border border-indigo-500/30">
-              {generalHunts.length} Items
+              {generalHunts.length} Selected
             </span>
           </div>
         </div>
-        {generalHunts.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
+        {hypotheses.length > 0 ? (
+          <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+            <table className="w-full text-left text-sm whitespace-nowrap relative">
+              <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e] sticky top-0 z-10 shadow-sm">
                 <tr>
+                  <th className="px-4 py-3 font-semibold w-[150px]">Selection</th>
                   <th className="px-4 py-3 font-semibold">Hypothesis Name</th>
                   <th className="px-4 py-3 font-semibold">MITRE Name</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2d3e]">
-                {generalHunts.map((hypo, index) => (
-                  <tr 
-                    key={hypo.id}
-                    onClick={() => setSelectedHypo(hypo)}
-                    className={`transition-colors hover:bg-[#252840] cursor-pointer ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
-                  >
-                    <td className="px-4 py-3 text-white font-medium">
-                      {hypo.hypoName}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-mono">
-                        {hypo.mitreId || '--'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {hypotheses.map((hypo, index) => {
+                  const assignment = generalHunts.find(a => a.hypothesis_id === hypo.id || a.id === hypo.id);
+                  const isSelected = !!assignment;
+
+                  return (
+                    <tr 
+                      key={hypo.id}
+                      className={`transition-colors hover:bg-[#252840] ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => {
+                            if (isSelected) {
+                              removeAssignment(assignment.id);
+                            } else {
+                              add({ ...hypo, month: selectedMonth, isGeneral: true, status: 'Planned' }, { campaign: true });
+                            }
+                          }}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-md border shadow-sm transition-all active:scale-95 ${
+                            isSelected 
+                              ? 'bg-green-500/20 text-green-400 border-green-500/40 hover:bg-green-500/30' 
+                              : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20'
+                          }`}
+                        >
+                          {isSelected ? '🟩 Selected' : '🟥 Not Selected'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-white font-medium cursor-pointer hover:text-indigo-300" onClick={() => setSelectedHypo(hypo)}>
+                        {hypo.hypoName}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-mono">
+                          {hypo.mitreId || '--'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
           <div className="p-8 text-center">
-            <p className="text-gray-500 text-sm">No general pool hunts for this month.</p>
+            <p className="text-gray-500 text-sm">No hypotheses found in your library.</p>
             <button
               onClick={() => navigate('/add')}
               className="mt-3 text-indigo-400 text-sm hover:text-indigo-300 transition-colors"
             >
-              + Add a General Hunt
+              + Add a Hypothesis to Library
             </button>
           </div>
         )}
       </div>
 
-      {/* Full monthly assignment roster */}
-      <div className="mb-10">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              📊 {formatMonth(selectedMonth)} — Hunt Assignments
-            </h3>
-            <p className="text-xs text-gray-500 mt-1">
-              All hunts scheduled this month (general + individual). Use Lead Import to bulk upload.
-            </p>
-          </div>
-          <span className="px-3 py-1 bg-[#252840] text-gray-300 text-xs font-bold rounded-full border border-[#2a2d3e]">
-            {monthHypotheses.length} total
-          </span>
-        </div>
 
-        {monthHypotheses.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Hypothesis</th>
-                    <th className="px-4 py-3 font-semibold">MITRE</th>
-                    <th className="px-4 py-3 font-semibold">Type</th>
-                    <th className="px-4 py-3 font-semibold">Client</th>
-                    <th className="px-4 py-3 font-semibold">Analyst</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Result</th>
-                    <th className="px-4 py-3 font-semibold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#2a2d3e]">
-                  {monthHypotheses.map((row, index) => (
-                    <tr
-                      key={row.id}
-                      className={`transition-colors hover:bg-[#252840] ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
-                    >
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedHypo(row)}
-                          className="text-left font-medium text-white hover:text-indigo-300 max-w-[220px] truncate block"
-                          title={row.hypoName}
-                        >
-                          {row.hypoName || 'Untitled'}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-indigo-400 text-xs">{row.mitreId || '--'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full border ${row.isGeneral ? 'border-indigo-500/40 text-indigo-300 bg-indigo-500/10' : 'border-teal-500/40 text-teal-300 bg-teal-500/10'}`}>
-                          {row.isGeneral ? 'General' : 'Individual'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">{row.clientName || '—'}</td>
-                      <td className="px-4 py-3 text-indigo-300">{row.assignedAnalyst || '—'}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={row.status || 'Pending'} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <ResultCell result={row.result} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => navigate(editCampaignHref(row))}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10"
-                        >
-                          <Edit className="w-3.5 h-3.5" /> Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-[#2a2d3e] bg-[#1a1d27]/50 p-10 text-center">
-            <p className="text-gray-500 text-sm">No hunts for {formatMonth(selectedMonth)} yet.</p>
-            <p className="text-gray-600 text-xs mt-2">Use Lead Import above to upload this month&apos;s plan.</p>
-          </div>
-        )}
-      </div>
 
       {/* Individual Hunts Table */}
       <div className="mb-8">
@@ -606,7 +540,7 @@ function Campaigns() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                exportToExcel(individualHunts, `Individual_Assignments_${formatMonth(selectedMonth).replace(/\s+/g, '')}`);
+                exportToExcel(individualHunts, `Individual_Assignments_${formatMonth(selectedMonth).replace(/\s+/g, '')}`, 'individual');
                 showToast("Individual assignments exported to Excel", "success");
               }}
               disabled={individualHunts.length === 0}
@@ -625,12 +559,10 @@ function Campaigns() {
         </div>
         {individualHunts.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
+            <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+              <table className="w-full text-left text-sm whitespace-nowrap relative">
+                <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e] sticky top-0 z-10 shadow-sm">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Hypothesis</th>
-                    <th className="px-4 py-3 font-semibold">MITRE</th>
                     <th className="px-4 py-3 font-semibold">Client</th>
                     <th className="px-4 py-3 font-semibold">Analyst</th>
                     <th className="px-4 py-3 font-semibold">Status / Date</th>
@@ -643,10 +575,6 @@ function Campaigns() {
                       key={hypo.id}
                       className={`transition-colors ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
                     >
-                      <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate" title={hypo.hypoName}>
-                        {hypo.hypoName || '--'}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-indigo-400">{hypo.mitreId || '--'}</td>
                       <td className="px-4 py-3 text-gray-300 font-bold">
                         {hypo.clientName ? (
                           <span className="flex items-center gap-2">🏢 {hypo.clientName}</span>
@@ -760,7 +688,7 @@ function Campaigns() {
       <HypoDetail
         hypothesis={selectedHypo}
         onClose={() => setSelectedHypo(null)}
-        onEdit={() => selectedHypo && navigate(editCampaignHref(selectedHypo))}
+        onEdit={() => selectedHypo && navigate(`/edit/${selectedHypo.hypothesis_id || selectedHypo.id}?from=campaigns&mode=hypothesis`)}
         currentStatus={selectedHypo?.status}
         onStatusChange={handleStatusChange}
         comments={selectedHypo?.comments}

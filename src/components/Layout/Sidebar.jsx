@@ -1,4 +1,3 @@
-import { NavLink } from 'react-router-dom'
 import { X } from 'lucide-react'
 
 const navItems = [
@@ -38,34 +37,36 @@ function Sidebar({ isOpen, onClose }) {
         </div>
 
         <nav className="flex-1 space-y-2 px-3">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={navClassName}
-              onClick={onClose}
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {navItems.map((item) => {
+            const isActive = item.to === '/' ? window.location.pathname === '/' : window.location.pathname.startsWith(item.to);
+            return (
+              <a
+                key={item.to}
+                href={item.to}
+                className={navClassName({ isActive })}
+                onClick={onClose}
+              >
+                {item.label}
+              </a>
+            );
+          })}
         </nav>
 
         <div className="border-t border-border p-3 hidden md:block">
-          <NavLink
-            to="/add"
+          <a
+            href="/add"
             onClick={onClose}
-            className={({ isActive }) =>
+            className={
               [
                 'block rounded-md px-4 py-3 text-center text-sm font-semibold text-white transition-colors',
-                isActive
+                window.location.pathname.startsWith('/add')
                   ? 'bg-accent-hover'
                   : 'bg-accent-primary hover:bg-accent-hover',
               ].join(' ')
             }
           >
             ➕ Add Hypothesis
-          </NavLink>
+          </a>
         </div>
       </aside>
     </>

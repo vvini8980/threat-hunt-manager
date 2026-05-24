@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Search } from 'lucide-react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Menu, Search } from 'lucide-react'
 import { useHypotheses } from '../../hooks/useHypotheses'
 import { StatusBadge } from '../Common/StatusBadge'
+import { goToPath } from '../../utils/goTo'
 
 const pageNames = [
   { match: (pathname) => pathname === '/', name: 'Dashboard' },
@@ -16,8 +17,19 @@ const pageNames = [
 
 function TopBar({ toggleSidebar }) {
   const { pathname } = useLocation()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { hypotheses } = useHypotheses()
+
+  const isFormPage = pathname === '/add' || pathname.startsWith('/edit/')
+  const formBackPath =
+    searchParams.get('from') === 'campaigns' ? '/campaigns' : '/hypotheses'
+
+  const handleFormBack = (e) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    goToPath(formBackPath)
+  }
 
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -87,15 +99,29 @@ function TopBar({ toggleSidebar }) {
   return (
     <header className="fixed left-0 md:left-[240px] right-0 top-0 z-10 flex h-[60px] items-center justify-between border-b border-border bg-bg-secondary px-4 md:px-6 gap-4">
       
-      {/* Left side: Hamburger + Page Name */}
-      <div className="flex items-center gap-4 shrink-0">
-        <button 
-          className="md:hidden text-gray-400 hover:text-white shrink-0" 
+      {/* Left side: Hamburger + Back (form pages) + Page Name */}
+      <div className="flex items-center gap-3 shrink-0 min-w-0">
+        <button
+          type="button"
+          className="md:hidden text-gray-400 hover:text-white shrink-0"
           onClick={toggleSidebar}
         >
           <Menu size={24} />
         </button>
-        <h1 className="text-lg font-semibold text-textprimary hidden md:block shrink-0 whitespace-nowrap">{pageName}</h1>
+        {isFormPage && (
+          <a
+            href={formBackPath}
+            onClick={handleFormBack}
+            className="inline-flex items-center gap-1.5 shrink-0 rounded-lg border border-[#2a2d3e] bg-[#1a1d27] px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white hover:border-indigo-500/50 hover:bg-[#252840] transition-colors no-underline"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </a>
+        )}
+        <h1 className="text-lg font-semibold text-textprimary hidden md:block shrink-0 whitespace-nowrap truncate">
+          {pageName}
+        </h1>
       </div>
 
       {/* Center: Global Search */}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { useMitre } from '../hooks/useMitre'
 import { useHypotheses } from '../hooks/useHypotheses'
 import { QueryTabs } from '../components/Common/QueryTabs'
@@ -10,10 +11,10 @@ import {
   getAssignmentForHypothesisMonth,
 } from '../services/storage'
 import { EMPTY_HYPOTHESIS_FORM, recordToForm, formToPayload } from '../utils/hypothesisForm'
+import { goToPath } from '../utils/goTo'
 
 export default function AddEdit() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { add, update } = useHypotheses()
   const { mitreData, search } = useMitre()
@@ -21,7 +22,7 @@ export default function AddEdit() {
 
   const monthParam = searchParams.get('month')
   const fromCampaigns = searchParams.get('from') === 'campaigns'
-  const isCampaignForm = fromCampaigns || Boolean(monthParam)
+  const isCampaignForm = searchParams.get('mode') === 'hypothesis' ? false : (fromCampaigns || Boolean(monthParam))
   const backPath = fromCampaigns ? '/campaigns' : '/hypotheses'
 
   const [form, setForm] = useState(EMPTY_HYPOTHESIS_FORM)
@@ -56,7 +57,7 @@ export default function AddEdit() {
 
         if (!hypo) {
           showToast('Hypothesis not found', 'error')
-          navigate(backPath, { replace: true })
+          goToPath(backPath)
           return
         }
 
@@ -81,7 +82,8 @@ export default function AddEdit() {
 
     loadRecord()
     return () => { cancelled = true }
-  }, [id, monthParam, backPath, navigate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load when id/month changes only
+  }, [id, monthParam, backPath])
 
   useEffect(() => {
     if (!id || !mitreData || !form.mitreId) return
@@ -138,6 +140,12 @@ export default function AddEdit() {
     setForm(f => ({ ...f, [key]: value }))
   }
 
+  const handleBack = (e) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    goToPath(backPath)
+  }
+
   const handleSubmit = async (e) => {
     e?.preventDefault?.()
 
@@ -158,7 +166,7 @@ export default function AddEdit() {
         showToast('Hypothesis saved successfully', 'success')
       }
 
-      navigate(backPath, { replace: true })
+      goToPath(backPath)
     } catch (err) {
       console.error(err)
       showToast(err?.message || 'Save failed', 'error')
@@ -178,113 +186,64 @@ export default function AddEdit() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 pb-32 md:pb-10">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            {id ? '✏️ Edit Hypothesis' : '➕ Add Hypothesis'}
-          </h1>
-          {isCampaignForm && (
-            <p className="text-sm text-indigo-300 mt-1">
-              Monthly campaign assignment — changes apply to this hunt month
-            </p>
-          )}
-        </div>
-        <Link
-          to={backPath}
-          className="text-gray-400 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-[#252840] transition-colors"
+    <div className="max-w-4xl mx-auto p-6 pb-32 md:pb-10 relative z-0">
+      <div className="relative z-[100] mb-8 pointer-events-auto">
+        <a
+          href={backPath}
+          onClick={handleBack}
+          className="inline-flex items-center gap-2 mb-4 rounded-lg border border-[#2a2d3e] bg-[#1a1d27] px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:border-indigo-500/50 hover:bg-[#252840] transition-colors cursor-pointer no-underline"
         >
-          ← Back
-        </Link>
+          <ArrowLeft className="h-4 w-4 shrink-0" />
+          Back to {fromCampaigns ? 'Monthly Campaigns' : 'Hypothesis Library'}
+        </a>
+        <h1 className="text-2xl font-bold text-white">
+          {id ? '✏️ Edit Hypothesis' : '➕ Add Hypothesis'}
+        </h1>
+        {isCampaignForm && (
+          <p className="text-sm text-indigo-300 mt-1">
+            Monthly campaign assignment — changes apply to this hunt month
+          </p>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className={sectionClass}>
-          <h2 className="text-lg font-semibold text-indigo-400 mb-4">
-            📌 Section 1 — Identity
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className={labelClass}>Hypothesis Name *</label>
-              <input
-                className={inputClass}
-                placeholder="e.g. Detect Encoded PowerShell Execution"
-                value={form.hypoName}
-                onChange={e => handleField('hypoName', e.target.value)}
-              />
-            </div>
-
-            <div className="relative">
-              <label className={labelClass}>MITRE ATT&CK ID *</label>
-              <input
-                className={inputClass}
-                placeholder="Search T1059 or PowerShell..."
-                value={mitreResults.length > 0 ? mitreSearch : (form.mitreId || '')}
-                onChange={e => {
-                  setMitreSearch(e.target.value)
-                  handleField('mitreId', e.target.value)
-                }}
-              />
-              {mitreResults.length > 0 && (
-                <div className="absolute z-20 w-full mt-1 bg-[#1e2130] border border-[#2a2d3e] rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                  {mitreResults.map(t => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => selectMitre(t)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-600/20 border-b border-[#2a2d3e] last:border-0"
-                    >
-                      <span className="text-indigo-400 font-mono">{t.id}</span>
-                      <span className="text-gray-300 ml-2">{t.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className={labelClass}>Sub-technique</label>
-              {subTechOptions.length > 0 ? (
-                <select
-                  className={inputClass}
-                  value={form.subTechnique}
-                  onChange={e => handleField('subTechnique', e.target.value)}
-                >
-                  <option value="">-- Select sub-technique --</option>
-                  {subTechOptions.map(s => (
-                    <option key={s.id} value={`${s.id} - ${s.name}`}>
-                      {s.id} - {s.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  className={inputClass}
-                  placeholder="e.g. T1059.001 - PowerShell"
-                  value={form.subTechnique}
-                  onChange={e => handleField('subTechnique', e.target.value)}
-                />
-              )}
-            </div>
-
-            <div>
-              <label className={labelClass}>Tactic</label>
-              <input
-                className={`${inputClass} text-indigo-300`}
-                placeholder="Auto-filled from MITRE ID"
-                value={form.tactic}
-                onChange={e => handleField('tactic', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {isCampaignForm && (
+        {isCampaignForm ? (
           <div className={sectionClass}>
             <h2 className="text-lg font-semibold text-indigo-400 mb-4">
-              📅 Section — Monthly Assignment
+              📅 Monthly Assignment
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className={labelClass}>Select Hypothesis *</label>
+                {id ? (
+                  <input
+                    className={inputClass}
+                    value={form.hypoName || ''}
+                    disabled
+                  />
+                ) : (
+                  <select
+                    className={inputClass}
+                    value={form.hypoName}
+                    onChange={e => {
+                      const selectedName = e.target.value;
+                      const selectedHypo = hypotheses.find(h => h.hypoName === selectedName);
+                      if (selectedHypo) {
+                        setForm(f => ({ ...f, hypoName: selectedHypo.hypoName, mitreId: selectedHypo.mitreId }));
+                      } else {
+                        handleField('hypoName', selectedName);
+                      }
+                    }}
+                  >
+                    <option value="">-- Select Hypothesis from Library --</option>
+                    {hypotheses.map(h => (
+                      <option key={h.id} value={h.hypoName}>
+                        {h.hypoName} ({h.mitreId})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div>
                 <label className={labelClass}>Hunt Month</label>
                 <input
@@ -301,10 +260,9 @@ export default function AddEdit() {
                   value={form.status}
                   onChange={e => handleField('status', e.target.value)}
                 >
-                  {['Planned', 'Active', 'Pending', 'Completed', 'Closed', 'Shared', 'ETA']
-                    .map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
+                  {['Planned', 'Active', 'Pending', 'Completed', 'Closed', 'Shared', 'ETA'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -332,7 +290,32 @@ export default function AddEdit() {
                   onChange={e => handleField('planned', e.target.value)}
                 />
               </div>
-              <div className="flex items-end">
+              <div>
+                <label className={labelClass}>Result</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['TP', 'FP', 'Undetermined', ''].map(r => (
+                    <button
+                      key={r || 'none'}
+                      type="button"
+                      onClick={() => handleField('result', r)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors flex-1 ${
+                        form.result === r
+                          ? r === 'TP'
+                            ? 'bg-green-500/30 border-green-500 text-green-400'
+                            : r === 'FP'
+                            ? 'bg-red-500/30 border-red-500 text-red-400'
+                            : r === 'Undetermined'
+                            ? 'bg-yellow-500/30 border-yellow-500 text-yellow-400'
+                            : 'bg-gray-500/30 border-gray-500 text-gray-300'
+                          : 'bg-transparent border-[#2a2d3e] text-gray-400 hover:border-gray-500'
+                      }`}
+                    >
+                      {r || 'None'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-2 flex items-center mt-2">
                 <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                   <input
                     type="checkbox"
@@ -345,99 +328,182 @@ export default function AddEdit() {
               </div>
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            <div className={sectionClass}>
+              <h2 className="text-lg font-semibold text-indigo-400 mb-4">
+                📌 Section 1 — Identity
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className={labelClass}>Hypothesis Name *</label>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. Detect Encoded PowerShell Execution"
+                    value={form.hypoName}
+                    onChange={e => handleField('hypoName', e.target.value)}
+                  />
+                </div>
 
-        <div className={sectionClass}>
-          <h2 className="text-lg font-semibold text-indigo-400 mb-4">
-            🔍 Section 2 — Hunt Content
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Description</label>
-              <textarea
-                className={`${inputClass} min-h-[80px] resize-y`}
-                placeholder="What are we hunting for and why?"
-                value={form.description}
-                onChange={e => handleField('description', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Hunting Logic</label>
-              <textarea
-                className={`${inputClass} min-h-[80px] resize-y`}
-                placeholder="How do we detect it? What signals do we look for?"
-                value={form.huntingLogic}
-                onChange={e => handleField('huntingLogic', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>SOC Detection Rule</label>
-              <textarea
-                className={`${inputClass} min-h-[80px] resize-y font-mono text-xs`}
-                placeholder="Detection rule logic or Sigma rule..."
-                value={form.socDetectionRule}
-                onChange={e => handleField('socDetectionRule', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
+                <div className="relative">
+                  <label className={labelClass}>MITRE ATT&CK ID *</label>
+                  <input
+                    className={inputClass}
+                    placeholder="Search T1059 or PowerShell..."
+                    value={mitreResults.length > 0 ? mitreSearch : (form.mitreId || '')}
+                    onChange={e => {
+                      setMitreSearch(e.target.value)
+                      handleField('mitreId', e.target.value)
+                    }}
+                  />
+                  {mitreResults.length > 0 && (
+                    <div className="absolute z-20 w-full mt-1 bg-[#1e2130] border border-[#2a2d3e] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                      {mitreResults.map(t => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => selectMitre(t)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-600/20 border-b border-[#2a2d3e] last:border-0"
+                        >
+                          <span className="text-indigo-400 font-mono">{t.id}</span>
+                          <span className="text-gray-300 ml-2">{t.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-        <div className={sectionClass}>
-          <h2 className="text-lg font-semibold text-indigo-400 mb-4">
-            💻 Section 3 — SIEM Queries
-          </h2>
-          <QueryTabs
-            values={{
-              splunkSPL: form.splunkSPL,
-              qradarAQL: form.qradarAQL,
-              sentinelKQL: form.sentinelKQL,
-            }}
-            onChange={(key, val) => handleField(key, val)}
-          />
-        </div>
+                <div>
+                  <label className={labelClass}>Sub-technique</label>
+                  {subTechOptions.length > 0 ? (
+                    <select
+                      className={inputClass}
+                      value={form.subTechnique}
+                      onChange={e => handleField('subTechnique', e.target.value)}
+                    >
+                      <option value="">-- Select sub-technique --</option>
+                      {subTechOptions.map(s => (
+                        <option key={s.id} value={`${s.id} - ${s.name}`}>
+                          {s.id} - {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className={inputClass}
+                      placeholder="e.g. T1059.001 - PowerShell"
+                      value={form.subTechnique}
+                      onChange={e => handleField('subTechnique', e.target.value)}
+                    />
+                  )}
+                </div>
 
-        <div className={sectionClass}>
-          <h2 className="text-lg font-semibold text-indigo-400 mb-4">
-            🎯 Section 4 — Outcome
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Result</label>
-              <div className="flex gap-3 flex-wrap">
-                {['TP', 'FP', 'Undetermined', ''].map(r => (
-                  <button
-                    key={r || 'none'}
-                    type="button"
-                    onClick={() => handleField('result', r)}
-                    className={`px-6 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      form.result === r
-                        ? r === 'TP'
-                          ? 'bg-green-500/30 border-green-500 text-green-400'
-                          : r === 'FP'
-                          ? 'bg-red-500/30 border-red-500 text-red-400'
-                          : r === 'Undetermined'
-                          ? 'bg-yellow-500/30 border-yellow-500 text-yellow-400'
-                          : 'bg-gray-500/30 border-gray-500 text-gray-300'
-                        : 'bg-transparent border-[#2a2d3e] text-gray-400 hover:border-gray-500'
-                    }`}
-                  >
-                    {r || 'None'}
-                  </button>
-                ))}
+                <div>
+                  <label className={labelClass}>Tactic</label>
+                  <input
+                    className={`${inputClass} text-indigo-300`}
+                    placeholder="Auto-filled from MITRE ID"
+                    value={form.tactic}
+                    onChange={e => handleField('tactic', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+
+            <div className={sectionClass}>
+              <h2 className="text-lg font-semibold text-indigo-400 mb-4">
+                🔍 Section 2 — Hunt Content
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Description</label>
+                  <textarea
+                    className={`${inputClass} min-h-[80px] resize-y`}
+                    placeholder="What are we hunting for and why?"
+                    value={form.description}
+                    onChange={e => handleField('description', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Hunting Logic</label>
+                  <textarea
+                    className={`${inputClass} min-h-[80px] resize-y`}
+                    placeholder="How do we detect it? What signals do we look for?"
+                    value={form.huntingLogic}
+                    onChange={e => handleField('huntingLogic', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>SOC Detection Rule</label>
+                  <textarea
+                    className={`${inputClass} min-h-[80px] resize-y font-mono text-xs`}
+                    placeholder="Detection rule logic or Sigma rule..."
+                    value={form.socDetectionRule}
+                    onChange={e => handleField('socDetectionRule', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className={sectionClass}>
+              <h2 className="text-lg font-semibold text-indigo-400 mb-4">
+                💻 Section 3 — SIEM Queries
+              </h2>
+              <QueryTabs
+                values={{
+                  splunkSPL: form.splunkSPL,
+                  qradarAQL: form.qradarAQL,
+                  sentinelKQL: form.sentinelKQL,
+                }}
+                onChange={(key, val) => handleField(key, val)}
+              />
+            </div>
+            
+            <div className={sectionClass}>
+              <h2 className="text-lg font-semibold text-indigo-400 mb-4">
+                🎯 Section 4 — Outcome
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Result</label>
+                  <div className="flex gap-3 flex-wrap">
+                    {['TP', 'FP', 'Undetermined', ''].map(r => (
+                      <button
+                        key={r || 'none'}
+                        type="button"
+                        onClick={() => handleField('result', r)}
+                        className={`px-6 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                          form.result === r
+                            ? r === 'TP'
+                              ? 'bg-green-500/30 border-green-500 text-green-400'
+                              : r === 'FP'
+                              ? 'bg-red-500/30 border-red-500 text-red-400'
+                              : r === 'Undetermined'
+                              ? 'bg-yellow-500/30 border-yellow-500 text-yellow-400'
+                              : 'bg-gray-500/30 border-gray-500 text-gray-300'
+                            : 'bg-transparent border-[#2a2d3e] text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        {r || 'None'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Sticky footer — sits above mobile bottom nav (z-40) */}
         <div className="fixed bottom-16 left-0 right-0 md:bottom-0 z-50 border-t border-[#2a2d3e] bg-[#1a1d27]/95 backdrop-blur-md px-6 py-4 md:static md:z-auto md:border-0 md:bg-transparent md:backdrop-blur-none md:px-0">
           <div className="max-w-4xl mx-auto flex gap-3 justify-end">
-            <Link
-              to={backPath}
-              className="px-6 py-2 rounded-lg border border-[#2a2d3e] text-gray-400 hover:text-white hover:border-gray-500 transition-colors text-center"
+            <a
+              href={backPath}
+              onClick={handleBack}
+              className="px-6 py-2 rounded-lg border border-[#2a2d3e] text-gray-400 hover:text-white hover:border-gray-500 transition-colors no-underline inline-block text-center"
             >
               Cancel
-            </Link>
+            </a>
             <button
               type="submit"
               disabled={saving}

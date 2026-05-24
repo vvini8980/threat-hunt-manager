@@ -31,28 +31,56 @@ export const mapRowToHypothesis = (row, columnMap) => {
   return hypothesis;
 };
 
-export const exportToExcel = (hypotheses, filename) => {
+const formatDateForExport = (dateValue) => {
+  if (!dateValue) return '';
+  
+  // Check if it's an Excel serial date number (e.g., 46165 or "46165")
+  if (!isNaN(dateValue) && Number(dateValue) > 10000) {
+    const utcDays = Math.floor(Number(dateValue) - 25569);
+    const dateInfo = new Date(utcDays * 86400 * 1000);
+    return dateInfo.toISOString().slice(0, 10);
+  }
+  
+  if (typeof dateValue === 'string') {
+    return dateValue.slice(0, 10);
+  }
+  
+  return String(dateValue);
+};
+
+export const exportToExcel = (hypotheses, filename, type = 'all') => {
   if (!hypotheses || hypotheses.length === 0) return;
 
-  const exportData = hypotheses.map(h => ({
-    "Hypothesis Name": h.hypoName || '',
-    "MITRE ID": h.mitreId || '',
-    "Sub Technique": h.subTechnique || '',
-    "Tactic": h.tactic || '',
-    "Month": h.month || '',
-    "Status": h.status || '',
-    "Planned Date": h.planned || '',
-    "Client Name": h.clientName || '',
-    "Assigned Analyst": h.assignedAnalyst || '',
-    "General Hunt": h.isGeneral ? 'Yes' : 'No',
-    "Description": h.description || '',
-    "Hunting Logic": h.huntingLogic || '',
-    "SOC Rule": h.socDetectionRule || '',
-    "Splunk Query": h.splunkSPL || '',
-    "QRadar Query": h.qradarAQL || '',
-    "Sentinel Query": h.sentinelKQL || '',
-    "Result": h.result || '',
-  }));
+  let exportData;
+
+  if (type === 'individual') {
+    exportData = hypotheses.map(h => ({
+      "Client Name": h.clientName || '',
+      "Assigned Analyst": h.assignedAnalyst || '',
+      "Status": h.status || '',
+      "Planned Date": formatDateForExport(h.planned)
+    }));
+  } else {
+    exportData = hypotheses.map(h => ({
+      "Hypothesis Name": h.hypoName || '',
+      "MITRE ID": h.mitreId || '',
+      "Sub Technique": h.subTechnique || '',
+      "Tactic": h.tactic || '',
+      "Month": h.month || '',
+      "Status": h.status || '',
+      "Planned Date": formatDateForExport(h.planned),
+      "Client Name": h.clientName || '',
+      "Assigned Analyst": h.assignedAnalyst || '',
+      "General Hunt": h.isGeneral ? 'Yes' : 'No',
+      "Description": h.description || '',
+      "Hunting Logic": h.huntingLogic || '',
+      "SOC Rule": h.socDetectionRule || '',
+      "Splunk Query": h.splunkSPL || '',
+      "QRadar Query": h.qradarAQL || '',
+      "Sentinel Query": h.sentinelKQL || '',
+      "Result": h.result || '',
+    }));
+  }
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();

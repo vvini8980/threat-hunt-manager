@@ -93,16 +93,8 @@ export const getAllHypotheses = async () => {
     const keepIds = new Set(unique.map(h => h.id));
     const duplicateIds = rows.filter(h => !keepIds.has(h.id)).map(h => h.id);
 
-    if (duplicateIds.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('hypotheses')
-        .delete()
-        .in('id', duplicateIds);
-
-      if (deleteError) {
-        console.warn('Could not remove duplicate hypotheses from database:', deleteError.message);
-      }
-    }
+    // We used to delete duplicate IDs here, but that is dangerous as it cascades deletes to assignments.
+    // Instead, we just return the deduplicated array for the UI.
 
     return unique;
   } catch (err) {
@@ -213,9 +205,18 @@ export const addHypothesis = async (data, { campaign = false } = {}) => {
 
   if (existing) {
     hypothesisId = existing.id;
+    
+    // Prevent empty columns in the spreadsheet from wiping out existing database data
+    const safeUpdateData = { updated_at: new Date().toISOString() };
+    Object.keys(hypoData).forEach(key => {
+      if (hypoData[key] !== '' && hypoData[key] !== null && hypoData[key] !== undefined) {
+        safeUpdateData[key] = hypoData[key];
+      }
+    });
+
     const { error: updateError } = await supabase
       .from('hypotheses')
-      .update({ ...hypoData, updated_at: new Date().toISOString() })
+      .update(safeUpdateData)
       .eq('id', hypothesisId);
 
     if (updateError) {
@@ -382,7 +383,7 @@ export const getAllAssignments = async () => {
   try {
     const { data, error } = await supabase
       .from('assignments')
-      .select('*, hypotheses(*), comments(*)');
+      .select('*, hypotheses(*, comments(*))');
       
     if (error) {
       console.error('Supabase error fetching assignments:', error);

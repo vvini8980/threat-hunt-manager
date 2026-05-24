@@ -188,7 +188,7 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', monthlyH
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-row items-center gap-2 w-full sm:w-auto justify-center">
       {/* Hidden file input */}
       <input
         ref={fileRef}
@@ -202,9 +202,9 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', monthlyH
       <button
         onClick={() => downloadTemplate(mode)}
         title="Download template"
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#2a2d3e] text-gray-400 hover:text-white hover:border-gray-500 text-xs font-medium transition-colors"
+        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[#2a2d3e] text-gray-400 hover:text-white hover:border-gray-500 text-xs font-medium transition-colors whitespace-nowrap"
       >
-        <Download className="w-3.5 h-3.5" />
+        <Download className="w-3.5 h-3.5 shrink-0" />
         Template
       </button>
 
@@ -212,7 +212,7 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', monthlyH
       <button
         onClick={() => fileRef.current?.click()}
         disabled={importing}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-lg ${
+        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-lg whitespace-nowrap ${
           mode === 'lead'
             ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20'
             : 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/20'

@@ -379,19 +379,19 @@ function Campaigns() {
         </div>
 
         {/* Right Side: Import + Export Buttons */}
-        <div className="flex flex-wrap items-center gap-3 self-center md:self-end md:mb-2">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 self-stretch md:self-end md:mb-2">
           <QuickImport
             mode="hypotheses"
             onDone={refresh}
           />
-          <div className="w-px h-6 bg-[#2a2d3e]" />
+          <div className="hidden sm:block w-px h-6 bg-[#2a2d3e]" />
           <QuickImport
             mode="lead"
             defaultMonth={selectedMonth}
             monthlyHypothesis={monthHypotheses.length > 0 ? monthHypotheses[0] : null}
             onDone={refresh}
           />
-          <div className="w-px h-6 bg-[#2a2d3e]" />
+          <div className="hidden sm:block w-px h-6 bg-[#2a2d3e]" />
           <button
             onClick={() => {
               exportToExcel(monthHypotheses, `MonthlyHunts_${formatMonth(selectedMonth).replace(/\s+/g, '')}`);
@@ -498,49 +498,52 @@ function Campaigns() {
 
       {/* Scheduled Hypotheses Table */}
       <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 overflow-hidden shadow-xl mb-8">
-        <div className="p-5 border-b border-indigo-500/30 flex items-center justify-between bg-indigo-500/10">
-          <div>
+        <div className="p-5 border-b border-indigo-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-indigo-500/10">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               📋 Monthly Hypotheses
             </h3>
+            
+            <span className="hidden md:block text-gray-500 font-bold text-lg">-</span>
+
             {/* Inline-editable hunt purpose */}
             {editingPurpose ? (
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2">
                 <input
                   autoFocus
                   value={purposeDraft}
                   onChange={e => setPurposeDraft(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') savePurpose(); if (e.key === 'Escape') setEditingPurpose(false); }}
                   placeholder="e.g. Exfiltration in Cloud"
-                  className="text-xs bg-indigo-900/40 border border-indigo-500/50 rounded px-2 py-0.5 text-indigo-100 placeholder-indigo-400/50 outline-none focus:border-indigo-400 w-64"
+                  className="text-lg font-bold bg-indigo-900/40 border border-indigo-500/50 rounded px-3 py-1 text-indigo-300 placeholder-indigo-400/50 outline-none focus:border-indigo-400 w-80"
                 />
                 <button onClick={savePurpose} className="text-green-400 hover:text-green-300">
-                  <Check className="w-4 h-4" />
+                  <Check className="w-5 h-5" />
                 </button>
                 <button onClick={() => setEditingPurpose(false)} className="text-gray-400 hover:text-gray-300">
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             ) : (
               <button
                 onClick={startEditPurpose}
-                className="flex items-center gap-1.5 mt-1 group"
+                className="flex items-center gap-2 group"
                 title="Click to set hunt purpose"
               >
                 {huntPurpose ? (
-                  <span className="text-xs text-indigo-300 font-semibold group-hover:text-indigo-200 transition-colors">
+                  <span className="text-lg text-[#00f2fe] font-bold tracking-wide group-hover:text-indigo-200 transition-colors drop-shadow-[0_0_8px_rgba(0,242,254,0.4)]">
                     🎯 {huntPurpose}
                   </span>
                 ) : (
-                  <span className="text-xs text-indigo-500/70 italic group-hover:text-indigo-400 transition-colors">
+                  <span className="text-lg text-indigo-500/70 italic font-semibold group-hover:text-indigo-400 transition-colors">
                     + Set hunt purpose...
                   </span>
                 )}
-                <Edit className="w-3 h-3 text-indigo-500/50 group-hover:text-indigo-400 transition-colors" />
+                <Edit className="w-4 h-4 text-indigo-500/50 group-hover:text-indigo-400 transition-colors" />
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => {
                 exportToExcel(
@@ -635,7 +638,7 @@ function Campaigns() {
         </div>
         {campaignAssignments.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
-            <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+            <div className="overflow-auto resize-y min-h-[200px] h-[400px]">
               <table className="w-full text-left text-sm whitespace-nowrap relative">
                 <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e] sticky top-0 z-10 shadow-sm">
                   <tr>

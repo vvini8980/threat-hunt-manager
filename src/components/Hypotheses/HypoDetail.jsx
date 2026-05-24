@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Edit, X, Trash2 } from 'lucide-react'
 import { QueryTabs } from '../Common/QueryTabs'
 import { ResultCell, StatusBadge } from '../Common/StatusBadge'
@@ -28,6 +28,47 @@ function HypoDetail({
   const { showToast } = useToastContext()
   const { remove, update } = useHypotheses()
   const navigate = useNavigate()
+
+  // --- Resize Logic ---
+  const [panelWidth, setPanelWidth] = useState(520)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeRef = useRef(null)
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing) return
+      // Calculate new width: window width minus mouse X position
+      // Max width: 50vw, Min width: 400px
+      const newWidth = window.innerWidth - e.clientX
+      const maxW = window.innerWidth * 0.5
+      setPanelWidth(Math.max(400, Math.min(newWidth, maxW)))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      // Prevent text selection while dragging
+      document.body.style.userSelect = 'none'
+    } else {
+      document.body.style.userSelect = ''
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
+  // --------------------
 
   if (!hypothesis) return null
 
@@ -142,16 +183,28 @@ function HypoDetail({
         onClick={onClose} 
         aria-label="Close details overlay"
       />
-      <aside className="fixed right-0 top-0 z-50 h-screen w-[520px] max-w-full animate-[slideInRight_180ms_ease-out] border-l border-[#2a2d3e] bg-[#1a1d27] shadow-[-24px_0_60px_rgba(0,0,0,0.45)]">
-        <div className="flex h-16 items-center justify-between border-b border-[#2a2d3e] px-5">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500">
-              Hypothesis Detail
-            </p>
-            <h2 className="text-lg font-semibold text-white">
-              {hypothesis.hypoName || 'Untitled Hypothesis'}
-            </h2>
-          </div>
+      <aside 
+        className="fixed right-0 top-0 z-50 h-screen max-w-full animate-[slideInRight_180ms_ease-out] border-l border-[#2a2d3e] bg-[#1a1d27] shadow-[-24px_0_60px_rgba(0,0,0,0.45)] flex"
+        style={{ width: `${panelWidth}px` }}
+      >
+        {/* Resize Handle */}
+        <div
+          ref={resizeRef}
+          onMouseDown={handleMouseDown}
+          className="w-1.5 h-full cursor-col-resize hover:bg-indigo-500/50 active:bg-indigo-500 absolute left-0 top-0 z-10 transition-colors"
+          title="Drag to resize"
+        />
+
+        <div className="flex-1 overflow-y-auto flex flex-col h-full w-full">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#2a2d3e] px-5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                Hypothesis Detail
+              </p>
+              <h2 className="text-lg font-semibold text-white">
+                {hypothesis.hypoName || 'Untitled Hypothesis'}
+              </h2>
+            </div>
 
           <div className="flex items-center gap-2">
             <button
@@ -333,7 +386,7 @@ function HypoDetail({
                 />
               ) : (
                 <>
-                  <pre className="min-h-[96px] overflow-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-6 text-gray-200">
+                  <pre className="min-h-[96px] resize-y overflow-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-6 text-gray-200">
                     {hypothesis.socDetectionRule || 'Not provided'}
                   </pre>
                   {hypothesis.socDetectionRule && (
@@ -481,6 +534,7 @@ function HypoDetail({
               </div>
             </section>
           </div>
+        </div>
         </div>
       </aside>
     </>

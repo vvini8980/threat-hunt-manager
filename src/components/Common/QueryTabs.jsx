@@ -36,7 +36,7 @@ export const QueryTabs = ({ values, onChange, readOnly = false }) => {
           <div key={tab.key} className="relative">
             {readOnly ? (
               <pre className="p-4 font-mono text-sm text-gray-300
-                bg-[#0f1117] min-h-[120px] overflow-auto whitespace-pre-wrap">
+                bg-[#0f1117] min-h-[120px] overflow-auto whitespace-pre-wrap resize-y">
                 {values[tab.key] || '-- No query defined --'}
               </pre>
             ) : (

@@ -91,19 +91,23 @@ const TechniquePanel = ({ technique, hypotheses = [], onClose, onAddHypo }) => {
             </div>
           ) : (
             <div className="flex flex-col">
-              {hypotheses.map((hyp, i) => (
+              {hypotheses.map((hyp, i) => {
+                const displayStatus = hyp.status || 'Pending';
+                
+                return (
                 <div key={hyp.id} className={`flex flex-col gap-2 py-4 ${i !== hypotheses.length - 1 ? 'border-b border-[#2a2d3e]' : ''}`}>
                   <div className="flex items-start justify-between gap-4">
-                    <span className="font-medium text-white">{hyp.name}</span>
-                    <span className="whitespace-nowrap text-xs font-medium text-gray-400">{hyp.month}</span>
+                    <span className="font-medium text-white">{hyp.hypoName || hyp.name || 'Untitled Hypothesis'}</span>
+                    <span className="whitespace-nowrap text-xs font-medium text-gray-400">{hyp.month || '--'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      hyp.status === 'Active' ? 'bg-blue-500/20 text-blue-400' :
-                      hyp.status === 'Planned' ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-green-500/20 text-green-400'
+                      displayStatus === 'Active' ? 'bg-blue-500/20 text-blue-400' :
+                      displayStatus === 'Planned' ? 'bg-yellow-500/20 text-yellow-400' :
+                      displayStatus === 'Completed' || displayStatus === 'Shared' ? 'bg-green-500/20 text-green-400' :
+                      'bg-gray-500/20 text-gray-400'
                     }`}>
-                      {hyp.status}
+                      {displayStatus}
                     </span>
                     {hyp.result && hyp.result !== 'Undetermined' && (
                       <span className={`rounded px-2 py-0.5 text-xs font-medium ${
@@ -116,7 +120,7 @@ const TechniquePanel = ({ technique, hypotheses = [], onClose, onAddHypo }) => {
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>

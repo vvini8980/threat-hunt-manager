@@ -158,22 +158,22 @@ function Dashboard() {
       color: 'indigo',
     },
     {
-      title: 'Active',
-      value: stats.active,
-      icon: Activity,
-      color: 'blue',
-    },
-    {
-      title: 'Planned',
-      value: stats.planned,
-      icon: Calendar,
-      color: 'yellow',
-    },
-    {
       title: 'Completed',
       value: stats.completed,
       icon: CheckCircle,
       color: 'green',
+    },
+    {
+      title: 'Not Completed',
+      value: (stats.planned || 0) + (stats.active || 0) + (stats.pending || 0),
+      icon: AlertTriangle,
+      color: 'yellow',
+    },
+    {
+      title: 'Active',
+      value: stats.active,
+      icon: Activity,
+      color: 'blue',
     },
     {
       title: 'True Positives',

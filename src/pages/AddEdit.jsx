@@ -21,6 +21,9 @@ const EMPTY_FORM = {
   sentinelKQL: '',
   result: '',
   comments: [],
+  clientName: '',
+  assignedAnalyst: '',
+  isGeneral: false,
 }
 
 export default function AddEdit() {
@@ -160,6 +163,48 @@ export default function AddEdit() {
               value={form.hypoName}
               onChange={e => handleField('hypoName', e.target.value)}
             />
+          </div>
+
+          {/* Client Name */}
+          <div>
+            <label className={labelClass}>Client Name</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. Acme Corp"
+              value={form.clientName || ''}
+              onChange={e => handleField('clientName', e.target.value)}
+            />
+          </div>
+
+          {/* Assigned Analyst */}
+          <div>
+            <label className={labelClass}>Assigned Analyst</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. John / Vinay"
+              value={form.assignedAnalyst || ''}
+              onChange={e => handleField('assignedAnalyst', e.target.value)}
+            />
+          </div>
+
+          {/* General Hunt Toggle */}
+          <div className="md:col-span-2">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div
+                onClick={() => handleField('isGeneral', !form.isGeneral)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                  form.isGeneral ? 'bg-indigo-600' : 'bg-[#2a2d3e]'
+                }`}
+              >
+                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${
+                  form.isGeneral ? 'translate-x-6' : 'translate-x-0'
+                }`} />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-white">General Pool Hunt</span>
+                <p className="text-xs text-gray-500">Mark this as a mandatory hunt that all analysts must complete this month</p>
+              </div>
+            </label>
           </div>
 
           {/* MITRE ID with autocomplete */}

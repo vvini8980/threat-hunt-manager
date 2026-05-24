@@ -71,9 +71,29 @@ function Campaigns() {
   const [monthsData, setMonthsData] = useState([]);
 
   useEffect(() => {
-    const data = getMonthlyStats();
+    const data = getMonthlyStats(hypotheses);
     setMonthsData(data);
   }, [hypotheses]);
+
+  // Split into general pool vs individual assignments
+  const generalHunts = monthHypotheses.filter(h => h.isGeneral);
+  const individualHunts = monthHypotheses.filter(h => !h.isGeneral);
+
+  // Group individual hunts by analyst
+  const byAnalyst = individualHunts.reduce((acc, h) => {
+    const key = h.assignedAnalyst || 'Unassigned';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(h);
+    return acc;
+  }, {});
+
+  // Group by client
+  const byClient = monthHypotheses.reduce((acc, h) => {
+    const key = h.clientName || 'No Client';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(h);
+    return acc;
+  }, {});
 
   const allMonths = Array.from(
     new Set([...monthsData.map(d => d.month), selectedMonth].filter(Boolean))
@@ -334,24 +354,26 @@ function Campaigns() {
         </div>
       </div>
 
-      {/* Hypotheses List */}
-      <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] overflow-hidden shadow-xl">
-        <div className="p-5 border-b border-[#2a2d3e] flex items-center justify-between bg-[#0f1117]">
-          <h3 className="text-lg font-bold text-white">
-            Hypotheses — {formatMonth(selectedMonth)}
-          </h3>
-          <span className="px-3 py-1 bg-[#2a2d3e] text-gray-300 text-xs font-bold rounded-full">
-            {monthHypotheses.length} Items
+      {/* General Pool */}
+      <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 overflow-hidden shadow-xl mb-8">
+        <div className="p-5 border-b border-indigo-500/30 flex items-center justify-between bg-indigo-500/10">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              📋 General Pool — Mandatory Hunts
+            </h3>
+            <p className="text-xs text-indigo-300 mt-0.5">All analysts must complete these hunts this month</p>
+          </div>
+          <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full border border-indigo-500/30">
+            {generalHunts.length} Items
           </span>
         </div>
-
-        {monthHypotheses.length > 0 ? (
-          <div className="flex flex-col divide-y divide-[#2a2d3e]">
-            {monthHypotheses.map((hypo) => (
-              <div 
+        {generalHunts.length > 0 ? (
+          <div className="flex flex-col divide-y divide-indigo-500/20">
+            {generalHunts.map((hypo) => (
+              <div
                 key={hypo.id}
                 onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-[#252840] transition-colors cursor-pointer group gap-4"
+                className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-indigo-500/10 transition-colors cursor-pointer group gap-4"
               >
                 <div className="flex items-center gap-4 flex-1">
                   <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getStatusColor(hypo.status)}`} />
@@ -363,15 +385,10 @@ function Campaigns() {
                       <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-mono">
                         {hypo.mitreId}
                       </span>
-                      {hypo.subTechnique && (
-                        <span className="text-xs text-gray-400">
-                          {hypo.subTechnique}
-                        </span>
-                      )}
+                      {hypo.tactic && <span className="text-xs text-gray-500">{hypo.tactic}</span>}
                     </div>
                   </div>
                 </div>
-                
                 <div className="flex items-center gap-3 pl-7 md:pl-0">
                   <StatusBadge status={hypo.status} />
                   <ResultBadge result={hypo.result} />
@@ -381,19 +398,89 @@ function Campaigns() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center p-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-[#2a2d3e] flex items-center justify-center mb-4">
-              <Calendar className="w-8 h-8 text-gray-400" />
-            </div>
-            <h4 className="text-lg font-bold text-white mb-2">No hypotheses for this month</h4>
-            <p className="text-gray-400 mb-6 max-w-sm">
-              It looks like there are no active hunt campaigns scheduled for {formatMonth(selectedMonth)}.
-            </p>
-            <button 
+          <div className="p-8 text-center">
+            <p className="text-gray-500 text-sm">No general pool hunts for this month.</p>
+            <button
               onClick={() => navigate('/add')}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg shadow-indigo-500/20 transition-colors"
+              className="mt-3 text-indigo-400 text-sm hover:text-indigo-300 transition-colors"
             >
-              Add your first hypothesis
+              + Add a General Hunt
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Individual Hunts by Analyst */}
+      <div className="mb-8">
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">👤 Individual Assignments</h3>
+        {Object.keys(byAnalyst).length > 0 ? (
+          <div className="flex flex-col gap-4">
+            {Object.entries(byAnalyst).map(([analyst, hunts]) => {
+              const done = hunts.filter(h => h.status === 'Completed' || h.status === 'Closed').length;
+              const pct = hunts.length > 0 ? Math.round((done / hunts.length) * 100) : 0;
+              return (
+                <div key={analyst} className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] overflow-hidden shadow-lg">
+                  <div className="p-4 border-b border-[#2a2d3e] flex items-center justify-between bg-[#0f1117]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-300 font-bold text-sm">
+                        {analyst.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">{analyst}</p>
+                        <p className="text-xs text-gray-400">{hunts.length} hunts • {done} completed</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="hidden md:flex flex-col items-end">
+                        <span className={`text-sm font-bold ${pct === 100 ? 'text-green-400' : pct > 50 ? 'text-yellow-400' : 'text-gray-400'}`}>{pct}%</span>
+                        <div className="w-24 h-1.5 bg-[#2a2d3e] rounded-full mt-1">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : pct > 50 ? 'bg-yellow-500' : 'bg-indigo-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-[#2a2d3e] text-gray-300 text-xs font-bold rounded-full">{hunts.length}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col divide-y divide-[#2a2d3e]">
+                    {hunts.map(hypo => (
+                      <div
+                        key={hypo.id}
+                        onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
+                        className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-[#252840] transition-colors cursor-pointer group gap-3"
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getStatusColor(hypo.status)}`} />
+                          <div>
+                            <p className="text-white text-sm font-medium group-hover:text-indigo-300 transition-colors">{hypo.hypoName}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                              <span className="text-xs font-mono text-indigo-400">{hypo.mitreId}</span>
+                              {hypo.clientName && (
+                                <span className="text-xs text-gray-500 bg-[#2a2d3e] px-2 py-0.5 rounded">🏢 {hypo.clientName}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pl-5 md:pl-0">
+                          <StatusBadge status={hypo.status} />
+                          <ResultBadge result={hypo.result} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-8 text-center">
+            <p className="text-gray-500 text-sm">No individual assignments for this month.</p>
+            <button
+              onClick={() => navigate('/add')}
+              className="mt-3 text-indigo-400 text-sm hover:text-indigo-300 transition-colors"
+            >
+              + Assign a Hunt
             </button>
           </div>
         )}

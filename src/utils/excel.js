@@ -38,8 +38,13 @@ export const exportToExcel = (hypotheses, filename) => {
     "Hypothesis Name": h.hypoName || '',
     "MITRE ID": h.mitreId || '',
     "Sub Technique": h.subTechnique || '',
+    "Tactic": h.tactic || '',
     "Month": h.month || '',
     "Status": h.status || '',
+    "Planned Date": h.planned || '',
+    "Client Name": h.clientName || '',
+    "Assigned Analyst": h.assignedAnalyst || '',
+    "General Hunt": h.isGeneral ? 'Yes' : 'No',
     "Description": h.description || '',
     "Hunting Logic": h.huntingLogic || '',
     "SOC Rule": h.socDetectionRule || '',
@@ -47,8 +52,6 @@ export const exportToExcel = (hypotheses, filename) => {
     "QRadar Query": h.qradarAQL || '',
     "Sentinel Query": h.sentinelKQL || '',
     "Result": h.result || '',
-    "Tactic": h.tactic || '',
-    "Planned Date": h.planned || ''
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -63,8 +66,13 @@ export const generateExcelTemplate = () => {
     "Hypothesis Name": "",
     "MITRE ID": "",
     "Sub Technique": "",
+    "Tactic": "",
     "Month": "",
     "Status": "",
+    "Planned Date": "",
+    "Client Name": "",
+    "Assigned Analyst": "",
+    "General Hunt": "No",
     "Description": "",
     "Hunting Logic": "",
     "SOC Rule": "",
@@ -72,8 +80,6 @@ export const generateExcelTemplate = () => {
     "QRadar Query": "",
     "Sentinel Query": "",
     "Result": "",
-    "Tactic": "",
-    "Planned Date": ""
   };
 
   const worksheet = XLSX.utils.json_to_sheet([emptyRow]);

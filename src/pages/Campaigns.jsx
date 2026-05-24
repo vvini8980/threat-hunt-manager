@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Calendar, 
   Target, CheckCircle, Activity, 
   ShieldCheck, AlertTriangle,
-  FileSpreadsheet
+  FileSpreadsheet, Edit
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useToastContext } from '../context/ToastContext';
@@ -357,9 +357,17 @@ function Campaigns() {
             </h3>
             <p className="text-xs text-indigo-300 mt-0.5">All analysts must complete these hunts this month</p>
           </div>
-          <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full border border-indigo-500/30">
-            {generalHunts.length} Items
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/add?type=general')}
+              className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg"
+            >
+              + Add Item
+            </button>
+            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full border border-indigo-500/30">
+              {generalHunts.length} Items
+            </span>
+          </div>
         </div>
         {generalHunts.length > 0 ? (
           <div className="flex flex-col divide-y divide-indigo-500/20">
@@ -406,32 +414,37 @@ function Campaigns() {
 
       {/* Individual Hunts Table */}
       <div className="mb-8">
-        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">👤 Individual Assignments</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">👤 Individual Assignments</h3>
+          <button
+            onClick={() => navigate('/add?type=individual')}
+            className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg"
+          >
+            + Add Assignment
+          </button>
+        </div>
         {individualHunts.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e]">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Planned Date/Month</th>
                     <th className="px-4 py-3 font-semibold">Client Name</th>
                     <th className="px-4 py-3 font-semibold">Assigned Analyst</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Hypothesis Name</th>
+                    <th className="px-4 py-3 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2a2d3e]">
                   {individualHunts.map((hypo, index) => (
                     <tr 
-                      key={hypo.id} 
-                      className={`transition-colors hover:bg-[#252840] ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
+                      key={hypo.id}
+                      onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
+                      className={`transition-colors hover:bg-[#252840] cursor-pointer ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
                     >
-                      <td className="px-4 py-3 text-gray-400">
-                        {hypo.month || '--'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">
+                      <td className="px-4 py-3 text-gray-300 font-bold">
                         {hypo.clientName ? (
-                          <span className="flex items-center gap-1">🏢 {hypo.clientName}</span>
+                          <span className="flex items-center gap-2">🏢 {hypo.clientName}</span>
                         ) : '--'}
                       </td>
                       <td className="px-4 py-3 text-indigo-300 font-medium">
@@ -440,12 +453,16 @@ function Campaigns() {
                       <td className="px-4 py-3">
                         <StatusBadge status={hypo.status} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => navigate(`/hypotheses?selected=${hypo.id}`)}
-                          className="font-bold text-white hover:text-indigo-400 transition-colors text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/edit/${hypo.id}`);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/20 rounded-md transition-colors"
+                          title="Edit Assignment"
                         >
-                          {hypo.hypoName || 'Untitled Hypothesis'}
+                          <Edit className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>

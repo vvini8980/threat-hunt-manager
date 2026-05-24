@@ -63,3 +63,24 @@ export const recordToForm = (record, overrides = {}) => {
     ...overrides,
   }
 }
+
+/** Clean payload for Supabase insert/update (no nested relations or UI-only fields) */
+export const formToPayload = (form) => ({
+  hypoName: form.hypoName?.trim() || '',
+  mitreId: form.mitreId?.trim() || '',
+  subTechnique: form.subTechnique || '',
+  tactic: form.tactic || '',
+  description: form.description || '',
+  huntingLogic: form.huntingLogic || '',
+  socDetectionRule: form.socDetectionRule || '',
+  splunkSPL: form.splunkSPL || '',
+  qradarAQL: form.qradarAQL || '',
+  sentinelKQL: form.sentinelKQL || '',
+  result: form.result || '',
+  month: form.month || '',
+  status: form.status || 'Planned',
+  planned: form.planned || '',
+  clientName: form.clientName || '',
+  assignedAnalyst: form.assignedAnalyst || '',
+  isGeneral: Boolean(form.isGeneral),
+})

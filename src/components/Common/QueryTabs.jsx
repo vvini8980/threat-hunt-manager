@@ -15,6 +15,7 @@ export const QueryTabs = ({ values, onChange, readOnly = false }) => {
       <div className="flex border-b border-[#2a2d3e] bg-[#0f1117]">
         {TABS.map(tab => (
           <button
+            type="button"
             key={tab.key}
             onClick={() => setActive(tab.key)}
             className={`px-4 py-2 text-sm font-mono font-medium
@@ -50,6 +51,7 @@ export const QueryTabs = ({ values, onChange, readOnly = false }) => {
             )}
             {readOnly && values[tab.key] && (
               <button
+                type="button"
                 onClick={() => navigator.clipboard.writeText(values[tab.key])}
                 className="absolute top-2 right-2 px-2 py-1 text-xs
                   bg-indigo-600 hover:bg-indigo-700 text-white rounded"

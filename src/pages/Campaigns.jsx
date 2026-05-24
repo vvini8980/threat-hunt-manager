@@ -5,13 +5,13 @@ import { getMonthlyStats, updateHypothesis, addComment } from '../services/stora
 import { exportToExcel } from '../utils/excel';
 import QuickImport from '../components/Common/QuickImport';
 import HypoDetail from '../components/Hypotheses/HypoDetail';
+import AssignmentEditPanel from '../components/Assignments/AssignmentEditPanel';
 import { 
   ChevronLeft, ChevronRight, Calendar, 
   Target, CheckCircle, Activity, 
-  ShieldCheck, AlertTriangle,
-  FileSpreadsheet, Edit, Check, X
+  ShieldCheck, AlertTriangle, Users, Clock,
+  FileSpreadsheet, Edit, Check, X, Trash2
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useToastContext } from '../context/ToastContext';
 import { ResultCell } from '../components/Common/StatusBadge';
 
@@ -61,23 +61,7 @@ const getDropdownStyle = (status) => {
   }
 };
 
-const CustomTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-[#1a1d27] border border-[#2a2d3e] p-3 rounded-lg shadow-xl">
-        <p className="font-bold text-white mb-2">{data.fullName}</p>
-        <p className="text-sm text-gray-300">Total: <span className="font-bold text-white">{data.total}</span></p>
-        <p className="text-sm text-green-400">TP: <span className="font-bold">{data.tp}</span></p>
-        <p className="text-sm text-red-400">FP: <span className="font-bold">{data.fp}</span></p>
-        {data.tested > 0 && (
-          <p className="text-xs text-gray-500 mt-2">TP Rate: {data.tpRate}%</p>
-        )}
-      </div>
-    );
-  }
-  return null;
-};
+
 
 function Campaigns() {
   const navigate = useNavigate();
@@ -90,9 +74,13 @@ function Campaigns() {
 
   // Side panel state
   const [selectedHypo, setSelectedHypo] = useState(null);
+  const [editingAssignment, setEditingAssignment] = useState(null);
 
   // Month status state (Drafted vs Production)
   const [monthStatus, setMonthStatus] = useState('Drafted');
+
+  // Status sorting state
+  const [statusSortDirection, setStatusSortDirection] = useState('none');
 
   useEffect(() => {
     setMonthStatus(localStorage.getItem(`campaign_status_${selectedMonth}`) || 'Drafted');
@@ -104,30 +92,83 @@ function Campaigns() {
     showToast(`Campaign set to ${newStatus}`, 'success');
   };
 
+  // Hunt purpose — one editable label per month
+  const [huntPurpose, setHuntPurpose] = useState('');
+  const [editingPurpose, setEditingPurpose] = useState(false);
+  const [purposeDraft, setPurposeDraft] = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`hunt_purpose_${selectedMonth}`) || '';
+    setHuntPurpose(saved);
+    setEditingPurpose(false);
+  }, [selectedMonth]);
+
+  const savePurpose = () => {
+    const trimmed = purposeDraft.trim();
+    setHuntPurpose(trimmed);
+    localStorage.setItem(`hunt_purpose_${selectedMonth}`, trimmed);
+    setEditingPurpose(false);
+    showToast('Hunt purpose saved', 'success');
+  };
+
+  const startEditPurpose = () => {
+    setPurposeDraft(huntPurpose);
+    setEditingPurpose(true);
+  };
+
   useEffect(() => {
     const data = getMonthlyStats(assignments);
     setMonthsData(data);
   }, [assignments]);
 
+  // Keep selectedHypo in sync with any updates made in the side panel
   useEffect(() => {
     if (selectedHypo) {
-      const updated = assignments.find(a => a.id === selectedHypo.id);
-      if (updated) setSelectedHypo(updated);
+      // Check if it's an assignment or a hypothesis by looking for hypothesis_id
+      if (selectedHypo.hypothesis_id) {
+        const updated = assignments.find(a => a.id === selectedHypo.id);
+        if (updated && JSON.stringify(updated) !== JSON.stringify(selectedHypo)) {
+          setSelectedHypo(updated);
+        }
+      } else {
+        const updated = hypotheses.find(h => h.id === selectedHypo.id);
+        if (updated && JSON.stringify(updated) !== JSON.stringify(selectedHypo)) {
+          setSelectedHypo(updated);
+        }
+      }
     }
-  }, [assignments, selectedHypo]);
+  }, [assignments, hypotheses, selectedHypo]);
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const isCurrentMonth = selectedMonth === currentMonthKey;
 
   const editCampaignHref = (row) => {
     const hypoId = row.hypothesis_id || row.id;
-    return `/edit/${hypoId}?month=${selectedMonth}&from=campaigns`;
+    const assignId = row.id; // row is the assignment row
+    return `/edit/${hypoId}?month=${selectedMonth}&from=campaigns&assignId=${assignId}`;
   };
 
 
 
+  // Normalize legacy "Month YYYY" to "YYYY-MM" for comparison
+  const toYYYYMM = (m) => {
+    if (!m) return '';
+    if (m.match(/^\d{4}-\d{2}$/)) return m;
+    try {
+      const realDate = new Date(m);
+      if (!isNaN(realDate)) {
+        return `${realDate.getFullYear()}-${String(realDate.getMonth() + 1).padStart(2, '0')}`;
+      }
+    } catch (e) {}
+    return m;
+  };
+
   const allMonths = Array.from(
-    new Set([...monthsData.map(d => d.month), selectedMonth].filter(Boolean))
+    new Set([
+      ...monthsData.map(d => d.month),
+      ...hypotheses.map(h => toYYYYMM(h.month)),
+      selectedMonth
+    ].filter(Boolean))
   ).sort();
   
   const currentIndex = allMonths.indexOf(selectedMonth);
@@ -197,12 +238,31 @@ function Campaigns() {
   // Derive stats based on selectedMonth filtering
   const monthHypotheses = assignments.filter(h => h.month === selectedMonth);
 
-  // Split into general pool vs individual assignments
-  const generalHunts = monthHypotheses.filter(h => h.isGeneral);
-  const individualHunts = monthHypotheses.filter(h => !h.isGeneral);
+  // All assignments for the month
+  const campaignAssignments = monthHypotheses;
+
+  // All hypotheses scheduled for this month
+  const monthFilteredHypotheses = hypotheses.filter(hypo => toYYYYMM(hypo.month) === selectedMonth);
+
+  const sortedCampaignAssignments = [...campaignAssignments].sort((a, b) => {
+    if (statusSortDirection === 'none') return 0;
+    const statusA = a.status || '';
+    const statusB = b.status || '';
+    if (statusSortDirection === 'asc') {
+      return statusA.localeCompare(statusB);
+    } else {
+      return statusB.localeCompare(statusA);
+    }
+  });
+
+  const toggleStatusSort = () => {
+    if (statusSortDirection === 'none') setStatusSortDirection('asc');
+    else if (statusSortDirection === 'asc') setStatusSortDirection('desc');
+    else setStatusSortDirection('none');
+  };
 
   // Group individual hunts by analyst
-  const byAnalyst = individualHunts.reduce((acc, h) => {
+  const byAnalyst = campaignAssignments.reduce((acc, h) => {
     const key = h.assignedAnalyst || 'Unassigned';
     if (!acc[key]) acc[key] = [];
     acc[key].push(h);
@@ -222,6 +282,7 @@ function Campaigns() {
     completed: monthHypotheses.filter(h => h.status === 'Completed' || h.status === 'Closed').length,
     active: monthHypotheses.filter(h => h.status === 'Active').length,
     planned: monthHypotheses.filter(h => h.status === 'Planned').length,
+    shared: monthHypotheses.filter(h => h.status === 'Shared').length,
     tp: monthHypotheses.filter(h => h.result === 'TP').length,
     fp: monthHypotheses.filter(h => h.result === 'FP').length,
   };
@@ -231,42 +292,6 @@ function Campaigns() {
 
   const statCardClass = "flex flex-col gap-2 rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-5 shadow-lg";
 
-  // Chart Data Preparation
-  const chartData = monthsData.filter(d => d.month).map(d => {
-    const tested = d.tp + d.fp;
-    const monthTpRate = tested > 0 ? Math.round((d.tp / tested) * 100) : 0;
-    
-    let color = '#6366f1'; // indigo-500
-    if (tested > 0) {
-      if (monthTpRate > 60) color = '#22c55e'; // green-500
-      else if (monthTpRate >= 30) color = '#eab308'; // yellow-500
-      else color = '#ef4444'; // red-500
-    }
-
-    let monthName = '';
-    let yearShort = '';
-    try {
-      const [year, month] = d.month.split('-');
-      const date = new Date(year, parseInt(month) - 1);
-      if (!isNaN(date.getTime())) {
-        monthName = date.toLocaleString('default', { month: 'short' });
-        yearShort = year.substring(2);
-      } else {
-        monthName = d.month;
-      }
-    } catch (e) {
-      monthName = d.month;
-    }
-
-    return {
-      ...d,
-      tpRate: monthTpRate,
-      tested,
-      color,
-      label: yearShort ? `${monthName} '${yearShort}` : monthName,
-      fullName: formatMonth(d.month)
-    };
-  });
 
   return (
     <section className="min-h-full bg-bg-primary p-6 text-white max-w-6xl mx-auto pb-24">
@@ -350,8 +375,14 @@ function Campaigns() {
         {/* Right Side: Import + Export Buttons */}
         <div className="flex flex-wrap items-center gap-3 self-center md:self-end md:mb-2">
           <QuickImport
+            mode="hypotheses"
+            onDone={refresh}
+          />
+          <div className="w-px h-6 bg-[#2a2d3e]" />
+          <QuickImport
             mode="lead"
             defaultMonth={selectedMonth}
+            monthlyHypothesis={monthHypotheses.length > 0 ? monthHypotheses[0] : null}
             onDone={refresh}
           />
           <div className="w-px h-6 bg-[#2a2d3e]" />
@@ -370,53 +401,61 @@ function Campaigns() {
       </div>
 
       {/* Stat Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className={statCardClass}>
           <div className="flex items-center justify-between text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Total</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Total Hypotheses</span>
             <Target className="h-4 w-4 text-indigo-400" />
           </div>
-          <span className="text-3xl font-bold text-indigo-400">{stats.total}</span>
+          <div className="flex flex-col">
+            <span className="text-3xl font-bold text-indigo-400">
+              {monthFilteredHypotheses.length}
+            </span>
+            <span className="text-xs font-medium text-gray-500 mt-1 tracking-wide uppercase">
+              {campaignAssignments.length} ASSIGNMENTS
+            </span>
+          </div>
         </div>
         
         <div className={statCardClass}>
           <div className="flex items-center justify-between text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Completed</span>
-            <CheckCircle className="h-4 w-4 text-green-400" />
+            <span className="text-xs font-bold uppercase tracking-wider">Total Clients</span>
+            <Users className="h-4 w-4 text-blue-400" />
           </div>
-          <span className="text-3xl font-bold text-green-400">{stats.completed}</span>
+          <div className="flex flex-col">
+            <span className="text-3xl font-bold text-blue-400">
+              {Array.from(new Set(campaignAssignments.map(a => a.clientName).filter(Boolean))).length}
+            </span>
+            <span className="text-xs font-medium text-gray-500 mt-1 tracking-wide uppercase">
+              <span className="text-teal-400">{campaignAssignments.filter(a => a.status === 'Shared').length}</span> Shared / <span className="text-green-400">{campaignAssignments.filter(a => a.status === 'Completed').length}</span> Completed
+            </span>
+          </div>
         </div>
 
         <div className={statCardClass}>
           <div className="flex items-center justify-between text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Active</span>
-            <Activity className="h-4 w-4 text-blue-400" />
+            <span className="text-xs font-bold uppercase tracking-wider">Pending / Planned / ETA</span>
+            <Clock className="h-4 w-4 text-yellow-400" />
           </div>
-          <span className="text-3xl font-bold text-blue-400">{stats.active}</span>
+          <div className="flex items-end gap-2 mt-1">
+            <span className="text-2xl font-bold text-yellow-400">{campaignAssignments.filter(a => a.status === 'Pending').length}</span>
+            <span className="text-lg font-bold text-gray-500 mb-0.5">/</span>
+            <span className="text-2xl font-bold text-indigo-300">{campaignAssignments.filter(a => a.status === 'Planned').length}</span>
+            <span className="text-lg font-bold text-gray-500 mb-0.5">/</span>
+            <span className="text-2xl font-bold text-orange-400">{campaignAssignments.filter(a => a.status === 'ETA').length}</span>
+          </div>
         </div>
 
         <div className={statCardClass}>
           <div className="flex items-center justify-between text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Planned</span>
-            <Calendar className="h-4 w-4 text-yellow-400" />
+            <span className="text-xs font-bold uppercase tracking-wider">TP / FP</span>
+            <ShieldCheck className="h-4 w-4 text-purple-400" />
           </div>
-          <span className="text-3xl font-bold text-yellow-400">{stats.planned}</span>
-        </div>
-
-        <div className={statCardClass}>
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider text-green-500">TP</span>
-            <ShieldCheck className="h-4 w-4 text-green-500" />
+          <div className="flex items-end gap-2 mt-1">
+            <span className="text-3xl font-bold text-green-500">{campaignAssignments.filter(a => a.result === 'TP').length}</span>
+            <span className="text-xl font-bold text-gray-500 mb-1">/</span>
+            <span className="text-3xl font-bold text-red-400">{campaignAssignments.filter(a => a.result === 'FP').length}</span>
           </div>
-          <span className="text-3xl font-bold text-green-500">{stats.tp}</span>
-        </div>
-
-        <div className={statCardClass}>
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider text-red-400">FP</span>
-            <AlertTriangle className="h-4 w-4 text-red-400" />
-          </div>
-          <span className="text-3xl font-bold text-red-400">{stats.fp}</span>
         </div>
       </div>
 
@@ -425,7 +464,7 @@ function Campaigns() {
         {/* Completion Rate */}
         <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-5 shadow-lg">
           <div className="mb-2 flex items-center justify-between text-sm font-medium">
-            <span className="text-white">Completion Rate: {stats.completed} of {stats.total} hypotheses complete</span>
+            <span className="text-white">Completion Rate: {stats.completed} of {stats.total} assignments complete</span>
             <span className="text-indigo-400 font-bold">{completionRate}%</span>
           </div>
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#2a2d3e]">
@@ -451,99 +490,129 @@ function Campaigns() {
         </div>
       </div>
 
-      {/* General Pool */}
+      {/* Scheduled Hypotheses Table */}
       <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 overflow-hidden shadow-xl mb-8">
         <div className="p-5 border-b border-indigo-500/30 flex items-center justify-between bg-indigo-500/10">
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              📋 General Pool — Mandatory Hunts
+              📋 Monthly Hypotheses
             </h3>
-            <p className="text-xs text-indigo-300 mt-0.5">All analysts must complete these hunts this month</p>
+            {/* Inline-editable hunt purpose */}
+            {editingPurpose ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  autoFocus
+                  value={purposeDraft}
+                  onChange={e => setPurposeDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') savePurpose(); if (e.key === 'Escape') setEditingPurpose(false); }}
+                  placeholder="e.g. Exfiltration in Cloud"
+                  className="text-xs bg-indigo-900/40 border border-indigo-500/50 rounded px-2 py-0.5 text-indigo-100 placeholder-indigo-400/50 outline-none focus:border-indigo-400 w-64"
+                />
+                <button onClick={savePurpose} className="text-green-400 hover:text-green-300">
+                  <Check className="w-4 h-4" />
+                </button>
+                <button onClick={() => setEditingPurpose(false)} className="text-gray-400 hover:text-gray-300">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={startEditPurpose}
+                className="flex items-center gap-1.5 mt-1 group"
+                title="Click to set hunt purpose"
+              >
+                {huntPurpose ? (
+                  <span className="text-xs text-indigo-300 font-semibold group-hover:text-indigo-200 transition-colors">
+                    🎯 {huntPurpose}
+                  </span>
+                ) : (
+                  <span className="text-xs text-indigo-500/70 italic group-hover:text-indigo-400 transition-colors">
+                    + Set hunt purpose...
+                  </span>
+                )}
+                <Edit className="w-3 h-3 text-indigo-500/50 group-hover:text-indigo-400 transition-colors" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full border border-indigo-500/30">
-              {generalHunts.length} Selected
-            </span>
-          </div>
-        </div>
-        {hypotheses.length > 0 ? (
-          <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
-            <table className="w-full text-left text-sm whitespace-nowrap relative">
-              <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-[#2a2d3e] sticky top-0 z-10 shadow-sm">
-                <tr>
-                  <th className="px-4 py-3 font-semibold w-[150px]">Selection</th>
-                  <th className="px-4 py-3 font-semibold">Hypothesis Name</th>
-                  <th className="px-4 py-3 font-semibold">MITRE Name</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#2a2d3e]">
-                {hypotheses.map((hypo, index) => {
-                  const assignment = generalHunts.find(a => a.hypothesis_id === hypo.id || a.id === hypo.id);
-                  const isSelected = !!assignment;
-
-                  return (
-                    <tr 
-                      key={hypo.id}
-                      className={`transition-colors hover:bg-[#252840] ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
-                    >
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => {
-                            if (isSelected) {
-                              removeAssignment(assignment.id);
-                            } else {
-                              add({ ...hypo, month: selectedMonth, isGeneral: true, status: 'Planned' }, { campaign: true });
-                            }
-                          }}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-md border shadow-sm transition-all active:scale-95 ${
-                            isSelected 
-                              ? 'bg-green-500/20 text-green-400 border-green-500/40 hover:bg-green-500/30' 
-                              : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20'
-                          }`}
-                        >
-                          {isSelected ? '🟩 Selected' : '🟥 Not Selected'}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-white font-medium cursor-pointer hover:text-indigo-300" onClick={() => setSelectedHypo(hypo)}>
-                        {hypo.hypoName}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-mono">
-                          {hypo.mitreId || '--'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-8 text-center">
-            <p className="text-gray-500 text-sm">No hypotheses found in your library.</p>
-            <button
-              onClick={() => navigate('/add')}
-              className="mt-3 text-indigo-400 text-sm hover:text-indigo-300 transition-colors"
-            >
-              + Add a Hypothesis to Library
-            </button>
-          </div>
-        )}
-      </div>
-
-
-
-      {/* Individual Hunts Table */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">👤 Individual Assignments</h3>
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                exportToExcel(individualHunts, `Individual_Assignments_${formatMonth(selectedMonth).replace(/\s+/g, '')}`, 'individual');
-                showToast("Individual assignments exported to Excel", "success");
+                exportToExcel(
+                  monthFilteredHypotheses.map(h => ({ ...h, hunt_purpose: huntPurpose })),
+                  `Monthly_Hypotheses_${formatMonth(selectedMonth).replace(/\s+/g, '')}`
+                );
+                showToast("Monthly Hypotheses exported to Excel", "success");
               }}
-              disabled={individualHunts.length === 0}
+              disabled={monthFilteredHypotheses.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-green-500/50 text-green-400 hover:bg-green-500/10 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Export Excel</span>
+            </button>
+            <span className="px-3 py-1.5 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-lg border border-indigo-500/30">
+              {monthFilteredHypotheses.length} Active
+            </span>
+          </div>
+        </div>
+        {(() => {
+          if (monthFilteredHypotheses.length === 0) return (
+                <div className="p-8 text-center bg-[#1a1d27]">
+                  <p className="text-gray-500 text-sm">No hypotheses scheduled for this month.</p>
+                  <button onClick={() => navigate('/hypotheses')} className="mt-3 text-indigo-400 text-sm hover:text-indigo-300">
+                    Go to Library to schedule a hypothesis
+                  </button>
+                </div>
+              );
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-[#0f1117] text-xs uppercase tracking-wide text-gray-400 border-b border-indigo-500/20">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold w-1/3">Hypothesis Name</th>
+                        <th className="px-4 py-3 font-semibold">Description</th>
+                        <th className="px-4 py-3 font-semibold">Mitre Name</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-indigo-500/10">
+                      {monthFilteredHypotheses.map((hypo, index) => (
+                        <tr 
+                          key={hypo.id}
+                          className={`transition-colors ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'} hover:bg-indigo-500/5`}
+                        >
+                          <td className="px-4 py-3 text-white font-medium cursor-pointer hover:text-indigo-300" onClick={() => setSelectedHypo(hypo)}>
+                            {hypo.hypoName}
+                          </td>
+                          <td className="px-4 py-3 text-gray-300 whitespace-normal">
+                            <div className="line-clamp-2" title={hypo.description}>
+                              {hypo.description || <span className="italic text-gray-500">No description provided</span>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-mono">
+                              {hypo.mitreId || '--'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+      </div>
+
+      {/* Campaign Assignments Table */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">👤 Campaign Assignments</h3>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                exportToExcel(campaignAssignments, `Campaign_Assignments_${formatMonth(selectedMonth).replace(/\s+/g, '')}`, 'individual');
+                showToast("Assignments exported to Excel", "success");
+              }}
+              disabled={campaignAssignments.length === 0}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-green-500/50 text-green-400 hover:bg-green-500/10 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
               <FileSpreadsheet className="w-4 h-4" />
@@ -557,7 +626,7 @@ function Campaigns() {
             </button>
           </div>
         </div>
-        {individualHunts.length > 0 ? (
+        {campaignAssignments.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#1a1d27] shadow-xl">
             <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
               <table className="w-full text-left text-sm whitespace-nowrap relative">
@@ -565,12 +634,22 @@ function Campaigns() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Client</th>
                     <th className="px-4 py-3 font-semibold">Analyst</th>
-                    <th className="px-4 py-3 font-semibold">Status / Date</th>
-                    <th className="px-4 py-3 font-semibold text-right">Edit</th>
+                    <th className="px-4 py-3 font-semibold">Month</th>
+                    <th 
+                      className="px-4 py-3 font-semibold cursor-pointer hover:text-indigo-300 select-none flex items-center gap-1"
+                      onClick={toggleStatusSort}
+                      title="Click to sort by status"
+                    >
+                      Status / Date
+                      {statusSortDirection === 'asc' && <span className="text-xs">▲</span>}
+                      {statusSortDirection === 'desc' && <span className="text-xs">▼</span>}
+                      {statusSortDirection === 'none' && <span className="text-xs text-gray-600">↕</span>}
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right">Edit / Delete</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2a2d3e]">
-                  {individualHunts.map((hypo, index) => (
+                  {sortedCampaignAssignments.map((hypo, index) => (
                     <tr 
                       key={hypo.id}
                       className={`transition-colors ${index % 2 === 0 ? 'bg-[#1a1d27]' : 'bg-[#1e2130]/45'}`}
@@ -582,6 +661,9 @@ function Campaigns() {
                       </td>
                       <td className="px-4 py-3 text-indigo-300 font-medium">
                         {hypo.assignedAnalyst || 'Unassigned'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 font-medium">
+                        {hypo.month || '--'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 max-w-xs">
@@ -615,14 +697,29 @@ function Campaigns() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => navigate(editCampaignHref(hypo))}
-                          className="p-2 rounded-md text-gray-400 hover:text-indigo-300 hover:bg-indigo-500/10"
-                          title="Edit full details"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingAssignment(hypo)}
+                            className="p-2 rounded-md text-gray-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                            title="Edit assignment details"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Delete this assignment? This cannot be undone.')) {
+                                removeAssignment(hypo.id);
+                                showToast('Assignment deleted', 'success');
+                              }
+                            }}
+                            className="p-2 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+                            title="Delete assignment"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -632,7 +729,7 @@ function Campaigns() {
           </div>
         ) : (
           <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-8 text-center shadow-xl">
-            <p className="text-gray-500 text-sm">No individual assignments for this month.</p>
+            <p className="text-gray-500 text-sm">No assignments for this month.</p>
             <button
               onClick={() => navigate('/add')}
               className="mt-3 text-indigo-400 text-sm hover:text-indigo-300 transition-colors"
@@ -643,48 +740,7 @@ function Campaigns() {
         )}
       </div>
 
-      {/* Campaign Timeline Chart */}
-      {chartData.length > 0 && (
-        <div className="rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-6 shadow-xl mt-8">
-          <h3 className="text-xl font-bold text-white mb-6">Campaign Timeline</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis 
-                  dataKey="label" 
-                  tick={{ fill: '#9ca3af', fontSize: 12 }} 
-                  axisLine={{ stroke: '#2a2d3e' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tick={{ fill: '#9ca3af', fontSize: 12 }} 
-                  axisLine={{ stroke: '#2a2d3e' }}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#252840' }} />
-                <Bar 
-                  dataKey="total" 
-                  radius={[4, 4, 0, 0]} 
-                  onClick={(data) => {
-                    if (data && data.month) setSelectedMonth(data.month);
-                  }}
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.color} 
-                      className="cursor-pointer transition-all duration-300 hover:brightness-125"
-                      opacity={entry.month === selectedMonth ? 1 : 0.4}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
+      {/* Side Panel for Hypothesis Details */}
       <HypoDetail
         hypothesis={selectedHypo}
         onClose={() => setSelectedHypo(null)}
@@ -693,8 +749,17 @@ function Campaigns() {
         onStatusChange={handleStatusChange}
         comments={selectedHypo?.comments}
         onAddComment={handleAddComment}
+        onSaveSuccess={refresh}
       />
 
+      {/* Side Panel for Editing Assignment */}
+      <AssignmentEditPanel 
+        assignment={editingAssignment}
+        onClose={() => setEditingAssignment(null)}
+        onSave={async (id, data) => {
+          await updateAssignment(id, data);
+        }}
+      />
     </section>
   );
 }

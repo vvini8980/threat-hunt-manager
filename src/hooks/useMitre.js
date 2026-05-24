@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { loadMitreData, searchTechniques, getTechniqueById } from '../services/mitre';
 
 export const useMitre = () => {
@@ -18,8 +18,8 @@ export const useMitre = () => {
       });
   }, []);
 
-  const search = (query) => searchTechniques(mitreData, query);
-  const getById = (id) => getTechniqueById(mitreData, id);
+  const search = useCallback((query) => searchTechniques(mitreData, query), [mitreData]);
+  const getById = useCallback((id) => getTechniqueById(mitreData, id), [mitreData]);
 
   return { mitreData, loading, error, search, getById };
 };

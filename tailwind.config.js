@@ -4,31 +4,35 @@ module.exports = {
     extend: {
       colors: {
         bg: {
-          primary: "#0f1117",
-          secondary: "#1a1d27",
-          card: "#1e2130",
-          hover: "#252840"
+          primary: "var(--bg-base)",
+          secondary: "var(--bg-surface)",
+          card: "var(--bg-surface)",
+          hover: "var(--color-muted)"
         },
         accent: {
-          primary: "#6366f1",
-          hover: "#4f46e5",
-          glow: "#818cf8"
+          primary: "var(--accent-primary)",
+          secondary: "var(--accent-secondary)",
+          hover: "var(--accent-secondary)",
+          glow: "var(--accent-primary)"
         },
         status: {
-          planned: "#f59e0b",
-          active: "#3b82f6",
-          pending: "#a855f7",
-          completed: "#10b981",
-          closed: "#6b7280"
+          planned: "var(--semantic-pending)",
+          active: "var(--accent-primary)",
+          pending: "var(--semantic-pending)",
+          completed: "var(--semantic-completed)",
+          closed: "var(--color-muted)",
+          critical: "var(--semantic-critical)",
+          inactive: "var(--semantic-inactive)"
         },
         result: {
-          tp: "#10b981",
-          fp: "#ef4444",
-          undetermined: "#f59e0b"
+          tp: "var(--semantic-completed)",
+          fp: "var(--semantic-critical)",
+          undetermined: "var(--semantic-pending)"
         },
-        border: "#2a2d3e",
-        textprimary: "#e2e8f0",
-        textsecondary: "#94a3b8"
+        border: "var(--color-muted)",
+        textprimary: "#f8fafc",
+        textsecondary: "#cbd5e1",
+        textmuted: "var(--color-muted)"
       },
       fontFamily: {
         mono: ["JetBrains Mono", "Fira Code", "monospace"]

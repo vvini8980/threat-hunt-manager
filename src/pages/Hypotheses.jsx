@@ -4,8 +4,10 @@ import HypoDetail from '../components/Hypotheses/HypoDetail'
 import HypoTable from '../components/Hypotheses/HypoTable'
 import { useHypotheses } from '../hooks/useHypotheses'
 import { addComment, updateHypothesis } from '../services/storage'
+import { exportToExcel } from '../utils/excel'
 import Spinner from '../components/Common/Spinner'
 import QuickImport from '../components/Common/QuickImport'
+import { FileSpreadsheet } from 'lucide-react'
 
 function Hypotheses() {
   const navigate = useNavigate()
@@ -67,7 +69,7 @@ function Hypotheses() {
   const selectClass =
     'h-10 rounded-lg border border-border bg-bg-primary px-3 text-sm text-textprimary outline-none transition-colors focus:border-accent-primary'
 
-  if (loading) {
+  if (loading && hypotheses.length === 0) {
     return <Spinner size="lg" text="Loading hunt library..." />
   }
 
@@ -84,11 +86,22 @@ function Hypotheses() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              exportToExcel(filteredHypotheses, 'Hypothesis_Library', 'hypotheses')
+            }}
+            disabled={filteredHypotheses.length === 0}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-green-500/50 text-green-400 hover:bg-green-500/10 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Export Excel</span>
+          </button>
+          <div className="w-px h-6 bg-[#2a2d3e]" />
           <QuickImport mode="hypotheses" onDone={refresh} />
           <Link
             to="/add"
-            className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover shadow-lg"
           >
             Add to Library
           </Link>
@@ -130,7 +143,8 @@ function Hypotheses() {
       <HypoDetail
         hypothesis={selectedHypo}
         onClose={() => setSelectedHypo(null)}
-        onEdit={() => selectedHypo && navigate(`/edit/${selectedHypo.id}`)}
+        onEdit={(hypo) => navigate(`/edit/${hypo.id}`)}
+        onSaveSuccess={refresh}
         comments={selectedHypo?.comments}
         onAddComment={handleAddComment}
       />

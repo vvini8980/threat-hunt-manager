@@ -14,13 +14,18 @@ function HypoDetail({
   onEdit,
   currentStatus,
   onStatusChange,
+  onSaveSuccess,
   comments,
   onAddComment,
 }) {
   const [commentText, setCommentText] = useState('')
   const [analyst, setAnalyst] = useState('Analyst')
+  const [isEditing, setIsEditing] = useState(false)
+  const [form, setForm] = useState({})
+  const [isSaving, setIsSaving] = useState(false)
+
   const { showToast } = useToastContext()
-  const { remove } = useHypotheses()
+  const { remove, update } = useHypotheses()
   const navigate = useNavigate()
 
   if (!hypothesis) return null
@@ -33,6 +38,7 @@ function HypoDetail({
     : '--'
   const sectionClass = 'rounded-xl border border-[#2a2d3e] bg-[#0f1117] p-4'
   const labelClass = 'mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500'
+  const inputClass = 'w-full rounded-lg bg-[#1a1d27] border border-[#2a2d3e] px-4 py-2 text-sm text-gray-200 outline-none transition-colors focus:border-indigo-500 hover:border-[#3a3d4e]'
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '--'
@@ -66,10 +72,52 @@ function HypoDetail({
 
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this hypothesis?')) {
-      remove(hypothesis.id)
+      const targetId = hypothesis.hypothesis_id || hypothesis.id
+      remove(targetId)
       showToast('Hypothesis deleted', 'error')
       onClose()
       navigate('/hypotheses')
+    }
+  }
+
+  const toggleEdit = () => {
+    if (!isEditing) {
+      setForm({
+        hypoName: hypothesis.hypoName || '',
+        mitreId: hypothesis.mitreId || '',
+        tactic: hypothesis.tactic || '',
+        subTechnique: hypothesis.subTechnique || '',
+        month: hypothesis.month || '',
+        planned: hypothesis.planned || '',
+        description: hypothesis.description || '',
+        huntingLogic: hypothesis.huntingLogic || '',
+        socDetectionRule: hypothesis.socDetectionRule || '',
+        splunkSPL: hypothesis.splunkSPL || '',
+        qradarAQL: hypothesis.qradarAQL || '',
+        sentinelKQL: hypothesis.sentinelKQL || ''
+      })
+      setIsEditing(true)
+    } else {
+      setIsEditing(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const targetId = hypothesis.hypothesis_id || hypothesis.id
+      const assignId = hypothesis.hypothesis_id ? hypothesis.id : null
+      await update(targetId, form, assignId)
+      showToast('Hypothesis updated', 'success')
+      setIsEditing(false)
+      onSaveSuccess?.()
+      // Note: hypothesis prop might not update immediately depending on parent state, 
+      // but if the parent pulls from the store, it will re-render.
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to save', 'error')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -94,9 +142,13 @@ function HypoDetail({
 
           <div className="flex items-center gap-2">
             <button
-              aria-label="Edit hypothesis"
-              onClick={() => onEdit?.(hypothesis)}
-              className="rounded-lg border border-[#2a2d3e] p-2 text-gray-400 transition-colors hover:border-indigo-500/50 hover:bg-indigo-500/15 hover:text-indigo-300"
+              aria-label={isEditing ? "Cancel editing" : "Edit hypothesis"}
+              onClick={toggleEdit}
+              className={`rounded-lg border p-2 transition-colors ${
+                isEditing 
+                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
+                  : 'border-[#2a2d3e] text-gray-400 hover:border-indigo-500/50 hover:bg-indigo-500/15 hover:text-indigo-300'
+              }`}
             >
               <Edit size={18} />
             </button>
@@ -119,42 +171,94 @@ function HypoDetail({
 
         <div className="h-[calc(100vh-4rem)] overflow-y-auto p-5">
           <div className="border-b border-[#2a2d3e] pb-5">
-            <h3 className="text-2xl font-bold leading-tight text-white">
-              {hypothesis.hypoName || 'Untitled Hypothesis'}
-            </h3>
+            {isEditing ? (
+              <input
+                className={`${inputClass} text-2xl font-bold leading-tight text-white mb-2 py-3`}
+                value={form.hypoName}
+                onChange={e => setForm(f => ({...f, hypoName: e.target.value}))}
+                placeholder="Hypothesis Name"
+              />
+            ) : (
+              <h3 className="text-2xl font-bold leading-tight text-white">
+                {hypothesis.hypoName || 'Untitled Hypothesis'}
+              </h3>
+            )}
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <span className="rounded-lg border border-indigo-500/30 bg-indigo-500/15 px-3 py-1.5 font-mono text-lg font-bold text-indigo-300">
-                {hypothesis.mitreId || '--'}
-              </span>
+            {isEditing ? (
+              <div className="mt-4 flex flex-wrap gap-3">
+                <input
+                  className={`${inputClass} w-32 font-mono`}
+                  value={form.mitreId}
+                  onChange={e => setForm(f => ({...f, mitreId: e.target.value}))}
+                  placeholder="MITRE ID"
+                />
+                <input
+                  className={`${inputClass} w-48`}
+                  value={form.tactic}
+                  onChange={e => setForm(f => ({...f, tactic: e.target.value}))}
+                  placeholder="Tactic"
+                />
+                <input
+                  className={`${inputClass} flex-1`}
+                  value={form.subTechnique}
+                  onChange={e => setForm(f => ({...f, subTechnique: e.target.value}))}
+                  placeholder="Sub-technique"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <span className="rounded-lg border border-indigo-500/30 bg-indigo-500/15 px-3 py-1.5 font-mono text-lg font-bold text-indigo-300">
+                    {hypothesis.mitreId || '--'}
+                  </span>
 
-              {hypothesis.tactic && (
-                <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-3 py-1 text-sm font-medium text-purple-300">
-                  {hypothesis.tactic}
-                </span>
-              )}
-            </div>
+                  {hypothesis.tactic && (
+                    <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-3 py-1 text-sm font-medium text-purple-300">
+                      {hypothesis.tactic}
+                    </span>
+                  )}
+                </div>
 
-            <p className="mt-3 text-sm text-gray-400">
-              {hypothesis.subTechnique || 'No sub-technique selected'}
-            </p>
+                <p className="mt-3 text-sm text-gray-400">
+                  {hypothesis.subTechnique || 'No sub-technique selected'}
+                </p>
+              </>
+            )}
 
             <div className="mt-5 grid grid-cols-3 gap-3 rounded-xl border border-[#2a2d3e] bg-[#0f1117] p-3">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">
                   Month
                 </p>
-                <p className="mt-1 text-sm font-medium text-gray-200">
-                  {hypothesis.month || '--'}
-                </p>
+                {isEditing ? (
+                  <input
+                    type="month"
+                    className={`${inputClass} mt-1 p-1 text-xs`}
+                    value={form.month}
+                    onChange={e => setForm(f => ({...f, month: e.target.value}))}
+                  />
+                ) : (
+                  <p className="mt-1 text-sm font-medium text-gray-200">
+                    {hypothesis.month || '--'}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">
                   Planned
                 </p>
-                <p className="mt-1 text-sm font-medium text-gray-200">
-                  {hypothesis.planned || '--'}
-                </p>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    className={`${inputClass} mt-1 p-1 text-xs`}
+                    value={form.planned}
+                    onChange={e => setForm(f => ({...f, planned: e.target.value}))}
+                  />
+                ) : (
+                  <p className="mt-1 text-sm font-medium text-gray-200">
+                    {hypothesis.planned || '--'}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">
@@ -175,47 +279,101 @@ function HypoDetail({
           <div className="space-y-4 pt-5">
             <section className={sectionClass}>
               <p className={labelClass}>Description</p>
-              <p className="text-sm leading-6 text-gray-200">
-                {hypothesis.description || 'Not provided'}
-              </p>
+              {isEditing ? (
+                <textarea
+                  className={`${inputClass} min-h-[80px] resize-y`}
+                  value={form.description}
+                  onChange={e => setForm(f => ({...f, description: e.target.value}))}
+                  placeholder="What are we hunting for and why?"
+                />
+              ) : (
+                <p className="text-sm leading-6 text-gray-200">
+                  {hypothesis.description || 'Not provided'}
+                </p>
+              )}
             </section>
 
             <section className={sectionClass}>
               <p className={labelClass}>Hunting Logic</p>
-              <p className="text-sm leading-6 text-gray-200">
-                {hypothesis.huntingLogic || 'Not provided'}
-              </p>
+              {isEditing ? (
+                <textarea
+                  className={`${inputClass} min-h-[80px] resize-y`}
+                  value={form.huntingLogic}
+                  onChange={e => setForm(f => ({...f, huntingLogic: e.target.value}))}
+                  placeholder="How do we detect it?"
+                />
+              ) : (
+                <p className="text-sm leading-6 text-gray-200">
+                  {hypothesis.huntingLogic || 'Not provided'}
+                </p>
+              )}
             </section>
 
             <section className={`${sectionClass} relative`}>
               <p className={labelClass}>SOC Detection Rule</p>
-              <pre className="min-h-[96px] overflow-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-6 text-gray-200">
-                {hypothesis.socDetectionRule || 'Not provided'}
-              </pre>
-              {hypothesis.socDetectionRule && (
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(hypothesis.socDetectionRule)
-                    showToast('Query copied to clipboard', 'info')
-                  }}
-                  className="absolute right-3 top-3 rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
-                >
-                  Copy
-                </button>
+              {isEditing ? (
+                <textarea
+                  className={`${inputClass} min-h-[80px] resize-y font-mono text-xs`}
+                  value={form.socDetectionRule}
+                  onChange={e => setForm(f => ({...f, socDetectionRule: e.target.value}))}
+                  placeholder="Detection rule logic..."
+                />
+              ) : (
+                <>
+                  <pre className="min-h-[96px] overflow-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-6 text-gray-200">
+                    {hypothesis.socDetectionRule || 'Not provided'}
+                  </pre>
+                  {hypothesis.socDetectionRule && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(hypothesis.socDetectionRule)
+                        showToast('Query copied to clipboard', 'info')
+                      }}
+                      className="absolute right-3 top-3 rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
+                    >
+                      Copy
+                    </button>
+                  )}
+                </>
               )}
             </section>
 
             <section className={sectionClass}>
               <p className={labelClass}>SIEM Queries</p>
               <QueryTabs
-                readOnly
-                values={{
+                readOnly={!isEditing}
+                values={isEditing ? {
+                  splunkSPL: form.splunkSPL,
+                  qradarAQL: form.qradarAQL,
+                  sentinelKQL: form.sentinelKQL,
+                } : {
                   splunkSPL: hypothesis.splunkSPL,
                   qradarAQL: hypothesis.qradarAQL,
                   sentinelKQL: hypothesis.sentinelKQL,
                 }}
+                onChange={isEditing ? (key, val) => setForm(f => ({ ...f, [key]: val })) : undefined}
               />
             </section>
+
+            {isEditing && (
+              <div className="pt-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={toggleEdit}
+                  className="px-5 py-2.5 rounded-lg border border-[#2a2d3e] text-gray-300 font-semibold text-sm hover:bg-[#1a1d27] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="px-6 py-2.5 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            )}
 
             <section className={sectionClass}>
               <p className={labelClass}>Comments</p>

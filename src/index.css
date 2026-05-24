@@ -2,20 +2,33 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+:root {
+  --bg-base: #0B0E14;
+  --bg-surface: #151A24;
+  --accent-primary: #6366f1; /* Indigo */
+  --accent-secondary: #8b5cf6; /* Violet */
+  --color-muted: #475569; /* Slate 600 */
+
+  --semantic-pending: #f59e0b; /* Amber/orange */
+  --semantic-completed: #10b981; /* Green */
+  --semantic-critical: #e11d48; /* Rose/Red */
+  --semantic-inactive: #334155; /* Slate 700 */
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: #0f1117;
+  background: var(--bg-base);
   color: #e2e8f0;
   font-family: "JetBrains Mono", "Fira Code", monospace;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2d3e #0f1117;
+  scrollbar-color: var(--bg-surface) var(--bg-base);
 }
 
 *::-webkit-scrollbar {
@@ -24,23 +37,22 @@ body {
 }
 
 *::-webkit-scrollbar-track {
-  background: #0f1117;
+  background: var(--bg-base);
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #2a2d3e;
+  background: var(--bg-surface);
   border-radius: 999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #252840;
+  background: var(--color-muted);
 }
 
 @keyframes slideInRight {
   from {
     transform: translateX(100%);
   }
-
   to {
     transform: translateX(0);
   }
@@ -54,4 +66,3 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) brightness(0.9);
   cursor: pointer;
 }
-

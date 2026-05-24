@@ -1,19 +1,21 @@
 function StatCard({ title, value, icon: Icon, color = 'indigo', subtitle }) {
   const colorClasses = {
-    indigo: 'bg-indigo-500/15 text-indigo-400',
-    blue: 'bg-blue-500/15 text-blue-400',
-    yellow: 'bg-yellow-500/15 text-yellow-400',
-    green: 'bg-green-500/15 text-green-400',
-    red: 'bg-red-500/15 text-red-400',
+    indigo: 'bg-accent-primary/15 text-accent-primary border-t-accent-primary',
+    blue: 'bg-status-active/15 text-status-active border-t-status-active',
+    teal: 'bg-status-completed/15 text-status-completed border-t-status-completed',
+    purple: 'bg-accent-secondary/15 text-accent-secondary border-t-accent-secondary',
+    yellow: 'bg-status-pending/15 text-status-pending border-t-status-pending',
+    green: 'bg-status-completed/15 text-status-completed border-t-status-completed',
+    red: 'bg-status-critical/15 text-status-critical border-t-status-critical',
   }
 
+  const selectedColor = colorClasses[color] || colorClasses.indigo
+
   return (
-    <div className="relative rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-5 transition-colors hover:border-indigo-500/40">
+    <div className={`relative rounded-xl border border-border bg-bg-card p-5 transition-colors hover:border-accent-primary/40 border-t-4 ${selectedColor.split(' ').find(c => c.startsWith('border-t-'))}`}>
       {Icon && (
         <div
-          className={`absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full ${
-            colorClasses[color] || colorClasses.indigo
-          }`}
+          className={`absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full ${selectedColor.split(' ').filter(c => !c.startsWith('border-t-')).join(' ')}`}
         >
           <Icon size={20} />
         </div>

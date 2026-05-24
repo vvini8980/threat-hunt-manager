@@ -57,11 +57,28 @@ export const exportToExcel = (hypotheses, filename, type = 'all') => {
     exportData = hypotheses.map(h => ({
       "Client Name": h.clientName || '',
       "Assigned Analyst": h.assignedAnalyst || '',
-      "Status": h.status || '',
-      "Planned Date": formatDateForExport(h.planned)
+      "Month": h.month || '',
+      "Status": h.status || ''
+    }));
+  } else if (type === 'hypotheses') {
+    exportData = hypotheses.map(h => ({
+      "Hypothesis Name": h.hypoName || '',
+      "MITRE ID": h.mitreId || '',
+      "Sub Technique": h.subTechnique || '',
+      "Tactic": h.tactic || '',
+      "Month": h.month || '',
+      "Description": h.description || '',
+      "Hunting Logic": h.huntingLogic || '',
+      "SOC Rule": h.socDetectionRule || '',
+      "Splunk Query": h.splunkSPL || '',
+      "QRadar Query": h.qradarAQL || '',
+      "Result": h.result || '',
+      "Comments": h.comments && h.comments.length > 0 ? h.comments.map(c => `${c.analyst || 'Analyst'}: ${c.text}`).join('\n') : '',
     }));
   } else {
+    // Default / 'all' - mostly used by Campaigns.jsx
     exportData = hypotheses.map(h => ({
+      "Hunt Purpose": h.hunt_purpose || '',
       "Hypothesis Name": h.hypoName || '',
       "MITRE ID": h.mitreId || '',
       "Sub Technique": h.subTechnique || '',
@@ -71,14 +88,13 @@ export const exportToExcel = (hypotheses, filename, type = 'all') => {
       "Planned Date": formatDateForExport(h.planned),
       "Client Name": h.clientName || '',
       "Assigned Analyst": h.assignedAnalyst || '',
-      "General Hunt": h.isGeneral ? 'Yes' : 'No',
       "Description": h.description || '',
       "Hunting Logic": h.huntingLogic || '',
       "SOC Rule": h.socDetectionRule || '',
       "Splunk Query": h.splunkSPL || '',
       "QRadar Query": h.qradarAQL || '',
-      "Sentinel Query": h.sentinelKQL || '',
       "Result": h.result || '',
+      "Comments": h.comments && h.comments.length > 0 ? h.comments.map(c => `${c.analyst || 'Analyst'}: ${c.text}`).join('\n') : '',
     }));
   }
 
@@ -100,7 +116,6 @@ export const generateExcelTemplate = () => {
     "Planned Date": "",
     "Client Name": "",
     "Assigned Analyst": "",
-    "General Hunt": "No",
     "Description": "",
     "Hunting Logic": "",
     "SOC Rule": "",
@@ -108,6 +123,7 @@ export const generateExcelTemplate = () => {
     "QRadar Query": "",
     "Sentinel Query": "",
     "Result": "",
+    "Comments": "",
   };
 
   const worksheet = XLSX.utils.json_to_sheet([emptyRow]);

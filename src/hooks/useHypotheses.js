@@ -26,8 +26,8 @@ export const useHypotheses = () => {
     await refresh();
   };
 
-  const update = async (id, data) => {
-    await storage.updateHypothesis(id, data);
+  const update = async (id, data, assignId = null) => {
+    await storage.updateHypothesis(id, data, assignId);
     await refresh();
   };
 

@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
-import { Upload, X, FileSpreadsheet, Download } from 'lucide-react';
+import { Upload, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { addHypothesis } from '../../services/storage';
+import { addHypothesis, addAssignment, addComment } from '../../services/storage';
 import { useToastContext } from '../../context/ToastContext';
+import ColumnMapper from '../Import/ColumnMapper';
+import { mapRowToHypothesis } from '../../utils/excel';
 
 // Column mappings from Excel header → internal field name
 const COLUMN_MAP = {
@@ -33,25 +35,10 @@ const COLUMN_MAP = {
   'AssignedAnalyst': 'assignedAnalyst',
   'Status': 'status',
   'Result': 'result',
-  'General Hunt': 'isGeneral',
   'IsGeneral': 'isGeneral',
   'Planned Date': 'planned',
   'PlannedDate': 'planned',
-};
-
-const parseRow = (row) => {
-  const hyp = {};
-  Object.entries(row).forEach(([excelCol, value]) => {
-    const field = COLUMN_MAP[excelCol];
-    if (field) {
-      if (field === 'isGeneral') {
-        hyp[field] = String(value).toLowerCase() === 'yes' || value === true;
-      } else {
-        hyp[field] = value !== undefined && value !== null ? String(value) : '';
-      }
-    }
-  });
-  return hyp;
+  'Comments': 'commentsText',
 };
 
 // Template configs per mode
@@ -61,23 +48,10 @@ const TEMPLATES = {
     filename: 'Lead_Monthly_Upload_Template.xlsx',
     sheetName: 'Lead Upload',
     columns: {
-      'Hypothesis Name': '',
-      'MITRE ID': '',
-      'Sub Technique': '',
-      'Tactic': '',
-      'Month': new Date().toISOString().slice(0, 7),
       'Client Name': '',
       'Assigned Analyst': '',
-      'General Hunt': 'No',
-      'Status': 'Planned',
-      'Planned Date': '',
-      'Description': '',
-      'Hunting Logic': '',
-      'SOC Rule': '',
-      'Splunk Query': '',
-      'QRadar Query': '',
-      'Sentinel Query': '',
-      'Result': '',
+      'Month': new Date().toISOString().slice(0, 7),
+      'Status': 'Planned'
     }
   },
   hypotheses: {
@@ -89,12 +63,15 @@ const TEMPLATES = {
       'MITRE ID': '',
       'Sub Technique': '',
       'Tactic': '',
+      'Month': new Date().toISOString().slice(0, 7),
       'Description': '',
       'Hunting Logic': '',
       'SOC Rule': '',
       'Splunk Query': '',
       'QRadar Query': '',
       'Sentinel Query': '',
+      'Result': '',
+      'Comments': '',
     }
   }
 };
@@ -111,13 +88,17 @@ const downloadTemplate = (mode) => {
  * QuickImport — a compact import button that can be dropped anywhere.
  * @param {string} mode - 'lead' | 'hypotheses'
  * @param {string} defaultMonth - pre-fill month for lead imports
+ * @param {object} monthlyHypothesis - The master hypothesis for the month (used for lead imports)
  * @param {function} onDone - called after successful import
  */
-export default function QuickImport({ mode = 'lead', defaultMonth = '', onDone }) {
+export default function QuickImport({ mode = 'lead', defaultMonth = '', monthlyHypothesis = null, onDone }) {
   const fileRef = useRef(null);
   const { showToast } = useToastContext();
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [showMapper, setShowMapper] = useState(false);
+  const [excelRows, setExcelRows] = useState([]);
+  const [excelHeaders, setExcelHeaders] = useState([]);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -129,25 +110,47 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', onDone }
       const data = new Uint8Array(await file.arrayBuffer());
       const wb = XLSX.read(data, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
+      
+      const actualColumns = XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || [];
       const rows = XLSX.utils.sheet_to_json(ws);
 
-      const valid = rows
-        .map(parseRow)
+
+
+      setExcelHeaders(actualColumns);
+      setExcelRows(rows);
+      setShowMapper(true);
+    } catch (error) {
+      showToast(`Error reading file: ${error.message || error}`, 'error');
+      setImporting(false);
+    }
+  };
+
+  const handleMappingComplete = async (mapping) => {
+    setShowMapper(false);
+    setImporting(true);
+
+    try {
+      const valid = excelRows
+        .map(row => mapRowToHypothesis(row, mapping))
         .map(h => {
           if (mode === 'lead') {
             return {
               ...h,
+              hypothesis_id: null,
               month: h.month || defaultMonth || new Date().toISOString().slice(0, 7),
               status: h.status || 'Planned',
-              isGeneral: h.isGeneral || false,
+              isGeneral: false,
             };
           }
           return h;
         })
-        .filter(h => h.hypoName && h.mitreId);
+        .filter(h => {
+          if (mode === 'lead') return h.clientName || h.assignedAnalyst;
+          return h.hypoName && h.mitreId;
+        });
 
       if (valid.length === 0) {
-        showToast('No valid rows found. Make sure Hypothesis Name and MITRE ID are filled.', 'error');
+        showToast('No valid rows found after mapping.', 'error');
         setImporting(false);
         return;
       }
@@ -155,7 +158,16 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', onDone }
       setProgress({ done: 0, total: valid.length });
 
       for (let i = 0; i < valid.length; i++) {
-        await addHypothesis(valid[i], { campaign: mode === 'lead' });
+        let added;
+        if (mode === 'lead') {
+          added = await addAssignment(valid[i]);
+        } else {
+          added = await addHypothesis(valid[i], { campaign: false });
+        }
+        
+        if (valid[i].commentsText && added?.id) {
+          await addComment(added.id, valid[i].commentsText, 'System Import');
+        }
         setProgress({ done: i + 1, total: valid.length });
       }
 
@@ -209,15 +221,40 @@ export default function QuickImport({ mode = 'lead', defaultMonth = '', onDone }
         {importing ? (
           <>
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            {progress.done}/{progress.total}
+            <span>Importing... ({progress.done}/{progress.total})</span>
           </>
         ) : (
           <>
             <Upload className="w-4 h-4" />
-            {mode === 'lead' ? '📋 Lead Import' : '📥 Import Hypotheses'}
+            {mode === 'lead' ? '📋 Assignments Import' : '📥 Import Hypotheses'}
           </>
         )}
       </button>
+
+      {showMapper && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto text-left">
+          <div className="w-full max-w-4xl bg-[#1a1d27] rounded-xl relative border border-[#2a2d3e]">
+            <button 
+              onClick={() => { setShowMapper(false); setImporting(false); }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-2">
+              <ColumnMapper 
+                headers={excelHeaders} 
+                onMappingComplete={handleMappingComplete}
+                customFields={mode === 'lead' ? [
+                  { key: 'clientName', label: 'Client Name', required: true },
+                  { key: 'assignedAnalyst', label: 'Assigned Analyst' },
+                  { key: 'month', label: 'Month' },
+                  { key: 'status', label: 'Status' }
+                ] : null}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

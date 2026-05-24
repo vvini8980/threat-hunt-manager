@@ -9,6 +9,7 @@ import Spinner from '../components/Common/Spinner'
 import {
   getHypothesisById,
   getAssignmentForHypothesisMonth,
+  getAssignmentById,
 } from '../services/storage'
 import { EMPTY_HYPOTHESIS_FORM, recordToForm, formToPayload } from '../utils/hypothesisForm'
 import { goToPath } from '../utils/goTo'
@@ -16,7 +17,7 @@ import { goToPath } from '../utils/goTo'
 export default function AddEdit() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
-  const { add, update } = useHypotheses()
+  const { hypotheses, add, update } = useHypotheses()
   const { mitreData, search } = useMitre()
   const { showToast } = useToastContext()
 
@@ -62,7 +63,13 @@ export default function AddEdit() {
         }
 
         let merged = hypo
-        if (monthParam) {
+        const assignIdParam = searchParams.get('assignId')
+        if (assignIdParam) {
+          const assignment = await getAssignmentById(assignIdParam)
+          if (assignment) {
+            merged = { ...hypo, ...assignment, id: hypo.id }
+          }
+        } else if (monthParam) {
           const assignment = await getAssignmentForHypothesisMonth(id, monthParam)
           if (assignment) {
             merged = { ...hypo, ...assignment, id: hypo.id }
@@ -112,7 +119,7 @@ export default function AddEdit() {
     if (mitreSearch.length > 1) {
       setMitreResults(search(mitreSearch))
     } else {
-      setMitreResults([])
+      setMitreResults(prev => prev.length === 0 ? prev : [])
     }
   }, [mitreSearch, search])
 
@@ -159,7 +166,8 @@ export default function AddEdit() {
       const payload = formToPayload(form)
 
       if (id) {
-        await update(id, payload)
+        const assignIdParam = searchParams.get('assignId')
+        await update(id, payload, assignIdParam)
         showToast('Hypothesis updated', 'success')
       } else {
         await add(payload, { campaign: isCampaignForm })
@@ -213,37 +221,7 @@ export default function AddEdit() {
               📅 Monthly Assignment
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className={labelClass}>Select Hypothesis *</label>
-                {id ? (
-                  <input
-                    className={inputClass}
-                    value={form.hypoName || ''}
-                    disabled
-                  />
-                ) : (
-                  <select
-                    className={inputClass}
-                    value={form.hypoName}
-                    onChange={e => {
-                      const selectedName = e.target.value;
-                      const selectedHypo = hypotheses.find(h => h.hypoName === selectedName);
-                      if (selectedHypo) {
-                        setForm(f => ({ ...f, hypoName: selectedHypo.hypoName, mitreId: selectedHypo.mitreId }));
-                      } else {
-                        handleField('hypoName', selectedName);
-                      }
-                    }}
-                  >
-                    <option value="">-- Select Hypothesis from Library --</option>
-                    {hypotheses.map(h => (
-                      <option key={h.id} value={h.hypoName}>
-                        {h.hypoName} ({h.mitreId})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+
               <div>
                 <label className={labelClass}>Hunt Month</label>
                 <input
@@ -315,17 +293,7 @@ export default function AddEdit() {
                   ))}
                 </div>
               </div>
-              <div className="md:col-span-2 flex items-center mt-2">
-                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.isGeneral}
-                    onChange={e => handleField('isGeneral', e.target.checked)}
-                    className="rounded border-[#2a2d3e]"
-                  />
-                  General pool hunt (mandatory for all analysts)
-                </label>
-              </div>
+
             </div>
           </div>
         ) : (

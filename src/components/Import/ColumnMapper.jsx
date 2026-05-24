@@ -20,12 +20,13 @@ const APP_FIELDS = [
   { key: 'result', label: 'Result' }
 ];
 
-const ColumnMapper = ({ headers = [], onMappingComplete }) => {
+const ColumnMapper = ({ headers = [], onMappingComplete, customFields = null }) => {
   const [mapping, setMapping] = useState({});
+  const fieldsToUse = customFields || APP_FIELDS;
 
   useEffect(() => {
     const initialMap = {};
-    APP_FIELDS.forEach(field => {
+    fieldsToUse.forEach(field => {
       const match = headers.find(h => {
         const headerNorm = h.toLowerCase().replace(/[^a-z0-9]/g, '');
         const labelNorm = field.label.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -35,7 +36,7 @@ const ColumnMapper = ({ headers = [], onMappingComplete }) => {
       initialMap[field.key] = match || '';
     });
     setMapping(initialMap);
-  }, [headers]);
+  }, [headers, fieldsToUse]);
 
   const handleChange = (fieldKey, headerValue) => {
     setMapping(prev => ({
@@ -44,7 +45,7 @@ const ColumnMapper = ({ headers = [], onMappingComplete }) => {
     }));
   };
 
-  const isPreviewDisabled = APP_FIELDS.filter(f => f.required).some(f => !mapping[f.key]);
+  const isPreviewDisabled = fieldsToUse.filter(f => f.required).some(f => !mapping[f.key]);
 
   return (
     <div className="bg-[#1a1d27] border border-[#2a2d3e] rounded-xl p-6 shadow-xl">
@@ -54,7 +55,7 @@ const ColumnMapper = ({ headers = [], onMappingComplete }) => {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 bg-[#0f1117] p-6 rounded-lg border border-[#2a2d3e]">
-        {APP_FIELDS.map(field => (
+        {fieldsToUse.map(field => (
           <div key={field.key} className="flex flex-col xl:flex-row xl:items-center justify-between gap-2 border-b border-[#2a2d3e] pb-3 last:border-0 md:border-0 md:pb-0">
             <label className="text-sm font-medium text-gray-300 w-full xl:w-1/2">
               {field.label} {field.required && <span className="text-red-400">*</span>}

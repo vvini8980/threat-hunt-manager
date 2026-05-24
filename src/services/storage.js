@@ -491,3 +491,40 @@ export const getMonthlyStats = (all = []) => {
 export const seedTestData = async () => {
   // Emptying seed function as data comes from the live database now
 };
+
+// 🎯 Monthly Settings 🎯
+export const getMonthlyPurpose = async (month) => {
+  try {
+    const { data, error } = await supabase
+      .from('monthly_settings')
+      .select('purpose')
+      .eq('month', month)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching monthly purpose:', error);
+      return '';
+    }
+    return data ? data.purpose : '';
+  } catch (err) {
+    console.error('Exception fetching monthly purpose:', err);
+    return '';
+  }
+};
+
+export const saveMonthlyPurpose = async (month, purpose) => {
+  try {
+    const { error } = await supabase
+      .from('monthly_settings')
+      .upsert({ month, purpose });
+
+    if (error) {
+      console.error('Error saving monthly purpose:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Exception saving monthly purpose:', err);
+    return false;
+  }
+};

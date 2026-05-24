@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHypotheses } from '../hooks/useHypotheses';
-import { getMonthlyStats, updateHypothesis, addComment } from '../services/storage';
+import { getMonthlyStats, updateHypothesis, addComment, getMonthlyPurpose, saveMonthlyPurpose } from '../services/storage';
 import { exportToExcel } from '../utils/excel';
 import QuickImport from '../components/Common/QuickImport';
 import HypoDetail from '../components/Hypotheses/HypoDetail';
@@ -98,17 +98,25 @@ function Campaigns() {
   const [purposeDraft, setPurposeDraft] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem(`hunt_purpose_${selectedMonth}`) || '';
-    setHuntPurpose(saved);
+    const loadPurpose = async () => {
+      const saved = await getMonthlyPurpose(selectedMonth);
+      setHuntPurpose(saved || '');
+    };
+    loadPurpose();
     setEditingPurpose(false);
   }, [selectedMonth]);
 
-  const savePurpose = () => {
+  const savePurpose = async () => {
     const trimmed = purposeDraft.trim();
     setHuntPurpose(trimmed);
-    localStorage.setItem(`hunt_purpose_${selectedMonth}`, trimmed);
     setEditingPurpose(false);
-    showToast('Hunt purpose saved', 'success');
+    
+    const success = await saveMonthlyPurpose(selectedMonth, trimmed);
+    if (success) {
+      showToast('Hunt purpose saved globally', 'success');
+    } else {
+      showToast('Failed to save hunt purpose to database', 'error');
+    }
   };
 
   const startEditPurpose = () => {

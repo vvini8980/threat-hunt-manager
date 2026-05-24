@@ -75,25 +75,7 @@ function Campaigns() {
     setMonthsData(data);
   }, [hypotheses]);
 
-  // Split into general pool vs individual assignments
-  const generalHunts = monthHypotheses.filter(h => h.isGeneral);
-  const individualHunts = monthHypotheses.filter(h => !h.isGeneral);
 
-  // Group individual hunts by analyst
-  const byAnalyst = individualHunts.reduce((acc, h) => {
-    const key = h.assignedAnalyst || 'Unassigned';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(h);
-    return acc;
-  }, {});
-
-  // Group by client
-  const byClient = monthHypotheses.reduce((acc, h) => {
-    const key = h.clientName || 'No Client';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(h);
-    return acc;
-  }, {});
 
   const allMonths = Array.from(
     new Set([...monthsData.map(d => d.month), selectedMonth].filter(Boolean))
@@ -134,7 +116,27 @@ function Campaigns() {
 
   // Derive stats based on selectedMonth filtering
   const monthHypotheses = hypotheses.filter(h => h.month === selectedMonth);
-  
+
+  // Split into general pool vs individual assignments
+  const generalHunts = monthHypotheses.filter(h => h.isGeneral);
+  const individualHunts = monthHypotheses.filter(h => !h.isGeneral);
+
+  // Group individual hunts by analyst
+  const byAnalyst = individualHunts.reduce((acc, h) => {
+    const key = h.assignedAnalyst || 'Unassigned';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(h);
+    return acc;
+  }, {});
+
+  // Group by client
+  const byClient = monthHypotheses.reduce((acc, h) => {
+    const key = h.clientName || 'No Client';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(h);
+    return acc;
+  }, {});
+
   const stats = {
     total: monthHypotheses.length,
     completed: monthHypotheses.filter(h => h.status === 'Completed' || h.status === 'Closed').length,

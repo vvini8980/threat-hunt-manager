@@ -10,6 +10,7 @@ import Coverage from './pages/Coverage'
 import Dashboard from './pages/Dashboard'
 import Hypotheses from './pages/Hypotheses'
 import Import from './pages/Import'
+import AIHub from './pages/AIHub'
 import { ToastProvider } from './context/ToastContext'
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
                 <Route path="/coverage" element={<Coverage />} />
                 <Route path="/campaigns" element={<Campaigns />} />
                 <Route path="/import" element={<Import />} />
+                <Route path="/ai-hub" element={<AIHub />} />
                 <Route path="/add" element={<AddEdit />} />
                 <Route path="/edit/:id" element={<AddEdit />} />
               </Routes>

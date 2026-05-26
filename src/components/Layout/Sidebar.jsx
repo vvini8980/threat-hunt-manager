@@ -3,9 +3,10 @@ import { X } from 'lucide-react'
 const navItems = [
   { to: '/', label: '🏠 Dashboard', end: true },
   { to: '/hypotheses', label: '📋 Hypotheses' },
-  { to: '/coverage', label: '🗺️ MITRE Coverage' },
+  { to: '/coverage', label: '🛡️ MITRE Coverage' },
   { to: '/campaigns', label: '📅 Monthly' },
-  { to: '/import', label: '📤 Import / Export' },
+  { to: '/ai-hub', label: '🧠 AI Hub' },
+  { to: '/import', label: '📥 Import / Export' },
 ]
 
 function Sidebar({ isOpen, onClose }) {
